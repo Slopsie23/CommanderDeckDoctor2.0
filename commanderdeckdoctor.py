@@ -233,18 +233,38 @@ for key, default in {
     st.session_state.setdefault(key, default)
 
 # ------------------ Cache Setup ------------------
-cache = diskcache.Cache("./cache_dir")
+import tempfile
+import diskcache
+import requests
+import logging
+import time
+
+# Tijdelijke cache-map gebruiken op Streamlit Cloud
+cache_dir = tempfile.mkdtemp()
+cache = diskcache.Cache(cache_dir)
+
+logging.basicConfig(level=logging.INFO)
+
 def safe_api_call(url):
-    if url in cache:
-        return cache[url]
+    """Haalt data op uit cache of via API. Voorkomt KeyErrors en crasht niet."""
+    cached = cache.get(url)
+    if cached is not None:
+        logging.info(f"Cache hit: {url}")
+        return cached
+    
     try:
+        logging.info(f"Calling API: {url}")
         r = requests.get(url)
         if r.status_code == 200:
             data = r.json()
-            cache[url] = data
+            cache.set(url, data)
+            logging.info(f"API success: {url}")
             return data
-    except:
-        pass
+        else:
+            logging.warning(f"API returned {r.status_code} for {url}")
+    except Exception as e:
+        logging.error(f"API call failed: {url} | Error: {e}")
+    
     return None
 
 def scryfall_search_all_limited(query, max_cards=1000):
@@ -261,9 +281,11 @@ def scryfall_search_all_limited(query, max_cards=1000):
                 break
             url = data.get("next_page")
             time.sleep(0.1)
-        except:
+        except Exception as e:
+            logging.error(f"Scryfall search failed for query '{query}': {e}")
             break
     return cards[:max_cards]
+
 
 # ------------------ Deck-box helper ------------------
 def add_to_deck_box(card):
@@ -357,6 +379,11 @@ with st.sidebar:
         st.warning("Logo niet gevonden. Upload '12.png'.")
 
     with st.expander("Deck", expanded=False):
+    # Zorg dat de map 'data' altijd bestaat
+        os.makedirs("data", exist_ok=True)
+
+        deck_file = "data/added_decks.json"
+
         st.caption("Beheer je eigen decks")
 
         # --- Gebruiker identificeren en onthouden ---

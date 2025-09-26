@@ -30,8 +30,10 @@ Thumbs.db
 # ---- Cache directories ----
 .cache/
 .cache_dir/
+cache/
+cdd_cache/
+deckdoctor_cache/
 
 # ---- Project specific ----
-# Laat added_decks.json altijd meegaan
-# Daarom: géén *.json uitsluiten!
-
+# Deck bestand lokaal houden
+data/added_decks.json
