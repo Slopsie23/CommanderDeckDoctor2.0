@@ -234,7 +234,6 @@ for key, default in {
 
 # ------------------ User Decks Init ------------------
 if "user_name" in st.session_state and st.session_state["user_name"]:
-<<<<<<< HEAD
     user_deck_key = get_user_deck_key()
     
     # 1. Probeer decks uit cache te halen
@@ -258,13 +257,6 @@ if "user_name" in st.session_state and st.session_state["user_name"]:
     if deck_box_cards:
         st.session_state["deck_box"] = deck_box_cards
 
-=======
-    load_user_decks()
-    deck_box_cards = cache.get(get_user_deck_key() + "_cards")
-    if deck_box_cards:
-        st.session_state["deck_box"] = deck_box_cards
-   
->>>>>>> d62f9860e1ce14edf678c5df657df35f9d039671
 # ------------------ User-specific Deck Cache ------------------
 import hashlib
 import uuid
@@ -300,7 +292,6 @@ def save_user_decks():
     json_file = os.path.join("data", f"{key}.json")
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(decks, f, ensure_ascii=False, indent=2)
-
 
 # ------------------ Cache Setup ------------------
 import tempfile
