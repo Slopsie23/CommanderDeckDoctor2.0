@@ -87,50 +87,130 @@ def save_user_decks():
     except Exception as e:
         st.error(f"Fout bij opslaan van decks: {e}")
         
-# ---------------- Landingpagina ----------------
-if not st.session_state.app_started:
+# ------------------ Globale CSS voor buttons en expanders ------------------
+st.markdown("""
+<style>
+/* Startknop styling */
+div.stButton > button {
+    border-radius: 12px !important;               /* minder ovaal */
+    background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a) !important;
+    color: white !important;
+    font-size: 22px !important;                   /* iets kleiner */
+    font-weight: bold !important;
+    padding: 10px 24px !important;               /* compacter */
+    border: none !important;
+    cursor: pointer;
+    margin-top: 12px;
+    box-shadow: 0 4px 10px rgba(59,124,59,0.5);  /* subtieler */
+    transition: all 0.3s ease-in-out;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+div.stButton > button:hover {
+    transform: scale(1.05) rotate(0deg);          /* subtiele hover */
+    box-shadow: 0 0 15px rgba(59,124,59,0.7), 0 6px 15px rgba(59,124,59,0.5);
+    background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
+}
+
+
+/* Expander header styling */
+div.st-expander > button {
+    background-color: #3b7c3b !important; /* groene kleur van set-logos */
+    color: white !important;
+    font-weight: bold;
+    border-radius: 8px !important;
+    padding: 8px 12px !important;
+    transition: all 0.3s ease-in-out;
+}
+
+/* Hover + pulse animatie */
+div.st-expander > button:hover {
+    animation: pulse 1.5s infinite;
+    transform: scale(1.02);
+    background-color: #5a995a !important;
+}
+
+/* Puls keyframes */
+@keyframes pulse {
+    0% { box-shadow: 0 0 5px rgba(59,124,59,0.4); }
+    50% { box-shadow: 0 0 15px rgba(59,124,59,0.7); }
+    100% { box-shadow: 0 0 5px rgba(59,124,59,0.4); }
+}
+
+/* Expander inhoud */
+div.st-expander > div[data-testid="stExpanderContent"] {
+    background-color: #1f2d1f !important;
+    padding: 8px 12px !important;
+    border-radius: 0 0 8px 8px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ------------------ Landingpagina ------------------
+if not st.session_state.get("app_started", False):
     # Sidebar verbergen
+    st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
+
     st.markdown("""
-        <style>
-        [data-testid="stSidebar"] {display: none;}
-        .landing-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            flex-direction: column;
-        }
-        .start-button {
-            border-radius: 50px !important;
-            background: linear-gradient(to right, #e7684f, #584d99) !important;
-            color: white !important;
-            font-size: 24px !important;
-            font-weight: bold !important;
-            padding: 16px 40px !important;
-            border: none !important;
-            cursor: pointer !important;
-            margin-top: 24px !important;
-            transition: all 0.2s ease-in-out !important;
-        }
-        .start-button:hover {
-            background: linear-gradient(to right, #584d99, #e7684f) !important;
-        }
-        </style>
+    <style>
+    .landing-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+        min-height: 00vh;
+        padding-top: 50px;
+        padding-bottom: 40px;
+        background: radial-gradient(circle at top left, #150f30, #001900);
+        color: white;
+        text-align: center;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .landing-image {
+        max-width: 400px;
+        width: 90%;
+        border-radius: 16px;
+        box-shadow: 0 12px 25px rgba(0,0,0,0.5);
+        margin-bottom: 24px;
+        transition: transform 0.6s ease, box-shadow 0.6s ease;
+    }
+    .landing-image:hover {
+        transform: rotate(02deg) scale(1.05);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+    }
+    .landing-subtext {
+        font-size: 18px;
+        opacity: 0.85;
+        margin-top: 12px;
+        animation: fadeIn 1.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+        from {opacity: 0; transform: translateY(20px);}
+        to {opacity: 0.85; transform: translateY(0);}
+    }
+    </style>
     """, unsafe_allow_html=True)
 
-    # Container voor landing
-    landing_container = st.container()
-    with landing_container:
-        if os.path.exists("12.png"):
-            img = Image.open("12.png")
-            st.image(img, use_container_width=False)  # behoud origineel formaat
-        else:
-            st.error("Afbeelding '12.png' niet gevonden.")
+    st.markdown('<div class="landing-container">', unsafe_allow_html=True)
 
-        # Knop om app te starten
-        if st.button("Start Doctoring", key="start_button"):
-            st.session_state.app_started = True
-            landing_container.empty()  # verwijder landing
+    # Afbeelding tonen
+    if os.path.exists("12.png"):
+        img = Image.open("12.png")
+        st.image(img, width=400)
+    else:
+        st.error("Afbeelding \'12.png\' niet gevonden.")
+
+    # Subtekst
+    st.markdown('<div class="landing-subtext">Welkom bij CommanderDeckDoctor</div>', unsafe_allow_html=True)
+
+    # Startknop
+    if st.button("Untap - Upkeep - Draw"):
+        st.session_state.app_started = True
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------- Hoofdapp ----------------
 else:
@@ -476,7 +556,7 @@ with st.sidebar:
     except:
         st.warning("Logo niet gevonden. Upload '12.png'.")
 
-    with st.expander("Deck", expanded=False):
+    with st.expander("Decks", expanded=False):
         # Zorg dat de map 'data' altijd bestaat
         os.makedirs("data", exist_ok=True)
 
@@ -528,7 +608,7 @@ with st.sidebar:
                 "My Decks",
                 [""] + list(st.session_state["deck_options"].keys()),
                 index=0,
-                help="Selecteer een deck | Geen selectie = geen kaarten"
+                help="Selecteer een deck | Geen deck geselecteerd = alle kaarten"
             )
 
             # ------------------ Reset deck state bij geen selectie ------------------
@@ -567,7 +647,7 @@ with st.sidebar:
                 "Remove Deck",
                 value=False if reset_checkbox else st.session_state.get("delete_deck_checkbox", False),
                 key="delete_deck_checkbox",
-                help="Verwijder geselecteerde deck uit deze lijst"
+                help="Verwijder het geselecteerde deck uit deze lijst"
             )
             if reset_checkbox:
                 st.session_state["reset_delete_deck_checkbox"] = False
@@ -605,7 +685,6 @@ def close_multiselect_on_select(widget_key: str):
     </script>
     """, unsafe_allow_html=True)
 
-
 # ---------------- Search & Find Expander ----------------
 with st.sidebar.expander("Search & Find", expanded=False):
     st.caption("Zoek gericht naar kaarten voor je deck")
@@ -639,12 +718,6 @@ with st.sidebar.expander("Search & Find", expanded=False):
         "Rarity Filter",
         ["All", "Common", "Uncommon", "Rare", "Mythic"],
         key="rarity_filter"
-    )
-
-    deck_include = st.checkbox(
-        "Met bestaande kaarten",
-        value=False,
-        key="deck_include_checkbox"
     )
 
     # --- Kindred selectie ---
@@ -687,17 +760,13 @@ with st.sidebar.expander("Search & Find", expanded=False):
 user_changed_input = (
     bool(set_filter.strip()) or
     bool(selected_analyses) or
-    type_filter != "All" or
-    deck_include
-)
-
+    type_filter != "All")
 # Als er een wijziging is, trigger de analyse alsof op de knop is gedrukt
 if user_changed_input and not start_btn:
     start_btn = True
 
 
 # ------------------ Export expander ------------------
-
 with st.sidebar.expander("Deck-Box", expanded=False):
     st.caption("Toegevoegde kaarten, klaar voor export")
 
@@ -1151,16 +1220,18 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
             """
             <style>
             .toggle-button button { 
-                width: 60px !important; 
-                height: 60px !important; 
-                border-radius: 12px !important; 
-                font-size: 24px !important; 
-                font-weight: bold !important; 
-                cursor: pointer; 
-                border: none !important; 
-                transition: all 0.2s ease-in-out; 
-                text-align: center; 
-                margin: 4px; 
+                   width: 60px !important; 
+                   height: 60px !important; 
+                   border-radius: 12px !important; 
+                   font-size: 24px !important; 
+                   font-weight: bold !important; 
+                   cursor: pointer; 
+                   border: none !important; 
+                   transition: all 0.2s ease-in-out; 
+                   display: flex !important;             /* flex container */
+                   justify-content: center !important;   /* horizontaal centreren */
+                   align-items: center !important;       /* verticaal centreren */
+                   margin: 4px auto !important;          /* horizontaal centreren van de button zelf */
             }
             </style>
             """, unsafe_allow_html=True
