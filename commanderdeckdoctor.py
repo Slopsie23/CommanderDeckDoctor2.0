@@ -851,14 +851,13 @@ if st.session_state.get("deck_loaded") and st.session_state.get("commanders"):
             if scry and "image_uris" in scry:
                 st.image(scry["image_uris"]["normal"], width=200, caption=name)
 
-# ------------------ Show my Deck (met caching) ------------------
+# ------------------ Show my Deck (met caching + parallel fetching) ------------------
 if st.session_state.get("deck_loaded") and st.session_state.get("show_deck", False):
     st.subheader(f"Volledig Deck: {st.session_state['selected_deck_name']}")
 
-    # Spinner starten
     spinner_ph = show_mana_spinner("2 woorden, 9 letters: Deck Laden...")
 
-    card_objs = []
+    import concurrent.futures
 
     def get_scryfall_card(name):
         """Haalt kaart op uit cache of Scryfall API"""
@@ -871,25 +870,37 @@ if st.session_state.get("deck_loaded") and st.session_state.get("show_deck", Fal
             cache.set(key, data)
         return data
 
-    # Loop over alle kaarten in het deck
-    for c in st.session_state["cards"]:
-        name = c['card']['oracleCard']['name']
-        scry = get_scryfall_card(name)
-        if scry:
-            card_objs.append(scry)
-        else:
-            # fallback afbeelding als API faalt
-            card_objs.append({
-                "name": name,
-                "image_uris": {"normal": "https://via.placeholder.com/223x310?text=Geen+afbeelding"}
-            })
+    # Alle kaartnamen in het deck
+    card_names = [c['card']['oracleCard']['name'] for c in st.session_state["cards"]]
 
-    # Kaarten renderen nadat alles geladen is
+    card_objs = []
+
+    # Parallel fetch
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(get_scryfall_card, name): name for name in card_names}
+        for future in concurrent.futures.as_completed(futures):
+            name = futures[future]
+            try:
+                scry = future.result()
+                if scry:
+                    card_objs.append(scry)
+                else:
+                    # fallback afbeelding
+                    card_objs.append({
+                        "name": name,
+                        "image_uris": {"normal": "https://via.placeholder.com/223x310?text=Geen+afbeelding"}
+                    })
+            except Exception:
+                # fallback bij errors
+                card_objs.append({
+                    "name": name,
+                    "image_uris": {"normal": "https://via.placeholder.com/223x310?text=Geen+afbeelding"}
+                })
+
+    # Kaarten renderen
     render_cards_with_add(card_objs)
 
-    # Spinner verwijderen
     spinner_ph.empty()
-
 
 # ------------------ Alternative Commanders Block ------------------
 selected_commanders = st.session_state.get("commanders", [])
@@ -1319,4 +1330,6 @@ def footer():
     st.markdown(footer_html, unsafe_allow_html=True)
 
 footer()
+
+ 
 
