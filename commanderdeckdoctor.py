@@ -359,8 +359,12 @@ def remove_from_deck_box(card):
     st.toast(f"{card['name']} verwijderd uit Deck-Box ❌")
 
 
-def render_cards_with_add(cards, columns=None):
-    """Render kaarten in een grid met Add- en Remove-knoppen"""
+# ------------------ Deck-Box / Kaarten renderen ------------------
+def render_cards_with_add(cards, columns=None, context="default"):
+    """
+    Render kaarten in een grid met Add- en Remove-knoppen.
+    context: string om unieke keys te maken per render (bijv. 'showdeck' of 'deckbox')
+    """
     if not cards:
         st.info("Geen kaarten om weer te geven.")
         return
@@ -369,9 +373,10 @@ def render_cards_with_add(cards, columns=None):
     for i in range(0, len(cards), columns):
         row_cards = cards[i:i + columns]
         cols = st.columns(columns)
-        for col_idx, card in enumerate(row_cards):
-            with cols[col_idx]:
-                # Kaart afbeelding ophalen
+
+        for idx, (col, card) in enumerate(zip(cols, row_cards)):
+            with col:
+                # Kaart afbeelding
                 img_url = card.get("image_uris", {}).get("normal") or \
                           card.get("card_faces", [{}])[0].get("image_uris", {}).get("normal") or \
                           "https://via.placeholder.com/223x310?text=Geen+afbeelding"
@@ -385,10 +390,11 @@ def render_cards_with_add(cards, columns=None):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Knoppen per kaart
-                add_key = f"add_card_{card.get('id', name)}"
-                remove_key = f"remove_card_{card.get('id', name)}"
+                # Unieke keys per kaart + context + index
+                add_key = f"add_{context}_{idx}_{card.get('id', name)}"
+                remove_key = f"remove_{context}_{idx}_{card.get('id', name)}"
 
+                # Add / Remove knoppen
                 if st.button("✚", key=add_key, help="Voeg toe aan Deck-Box"):
                     add_to_deck_box(card)
                 if st.button("✖", key=remove_key, help="Verwijder uit Deck-Box"):
