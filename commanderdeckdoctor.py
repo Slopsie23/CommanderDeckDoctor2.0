@@ -232,66 +232,63 @@ for key, default in {
 }.items():
     st.session_state.setdefault(key, default)
 
-# ------------------ User Decks Init ------------------
-if "user_name" in st.session_state and st.session_state["user_name"]:
-    user_deck_key = get_user_deck_key()
-    
-    # 1. Probeer decks uit cache te halen
-    cached_decks = cache.get(user_deck_key)
-    if cached_decks is not None:
-        st.session_state["added_decks"] = cached_decks
-    else:
-        # 2. Fallback: probeer JSON bestand
-        json_file = os.path.join("data", f"{user_deck_key}.json")
-        if os.path.exists(json_file):
-            try:
-                with open(json_file, "r", encoding="utf-8") as f:
-                    st.session_state["added_decks"] = json.load(f)
-            except Exception:
-                st.session_state["added_decks"] = []
-        else:
-            st.session_state["added_decks"] = []
-
-    # 3. Laad kaarten in de Deck-Box
-    deck_box_cards = cache.get(user_deck_key + "_cards")
-    if deck_box_cards:
-        st.session_state["deck_box"] = deck_box_cards
-
-# ------------------ User-specific Deck Cache ------------------
+# ------------------ User-specific Deck Helpers ------------------
 import hashlib
 import uuid
 
 def get_user_deck_key():
-    # maak unieke key per gebruiker op basis van gebruikersnaam
+    """Genereer een unieke sleutel per gebruiker op basis van naam of sessie-ID"""
     user_name = st.session_state.get("user_name", "").strip().lower()
     if not user_name:
-        # fallback: genereer tijdelijk session-id
         if "session_id" not in st.session_state:
             st.session_state["session_id"] = str(uuid.uuid4())
         user_name = st.session_state["session_id"]
-    # unieke key voor cache
     return f"added_decks_{hashlib.md5(user_name.encode()).hexdigest()}"
 
 def load_user_decks():
+    """Laad decks voor de huidige gebruiker uit cache of JSON-bestand"""
     key = get_user_deck_key()
     decks = cache.get(key)
-    if decks is None:
-        decks = []
-    st.session_state.setdefault("added_decks", decks)
-    return decks
+    if decks is not None:
+        st.session_state["added_decks"] = decks
+        return decks
+
+    # Fallback naar JSON-bestand
+    json_file = os.path.join("data", f"{key}.json")
+    if os.path.exists(json_file):
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                decks = json.load(f)
+                st.session_state["added_decks"] = decks
+                return decks
+        except Exception:
+            pass
+
+    st.session_state["added_decks"] = []
+    return []
 
 def save_user_decks():
+    """Sla huidige user decks op in cache én JSON"""
     key = get_user_deck_key()
     decks = st.session_state.get("added_decks", [])
-    
-    # opslaan in cache
     cache[key] = decks
-    
-    # extra fallback: opslaan in JSON
+
     os.makedirs("data", exist_ok=True)
     json_file = os.path.join("data", f"{key}.json")
-    with open(json_file, "w", encoding="utf-8") as f:
-        json.dump(decks, f, ensure_ascii=False, indent=2)
+    try:
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(decks, f, indent=2)
+    except Exception as e:
+        st.error(f"Fout bij opslaan van decks: {e}")
+
+# ------------------ User Decks Init ------------------
+if "user_name" in st.session_state and st.session_state["user_name"]:
+    load_user_decks()
+
+    # Laad kaarten uit de Deck-Box (per gebruiker)
+    deck_box_cards = cache.get(get_user_deck_key() + "_cards")
+    if deck_box_cards:
+        st.session_state["deck_box"] = deck_box_cards
 
 # ------------------ Cache Setup ------------------
 import tempfile
