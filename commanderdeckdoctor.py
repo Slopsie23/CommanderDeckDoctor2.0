@@ -231,6 +231,33 @@ for key, default in {
     'sheriff_active': False
 }.items():
     st.session_state.setdefault(key, default)
+    
+# ------------------ User-specific Deck Cache ------------------
+import hashlib
+import uuid
+
+def get_user_deck_key():
+    # maak unieke key per gebruiker op basis van gebruikersnaam
+    user_name = st.session_state.get("user_name", "").strip().lower()
+    if not user_name:
+        # fallback: genereer tijdelijk session-id
+        if "session_id" not in st.session_state:
+            st.session_state["session_id"] = str(uuid.uuid4())
+        user_name = st.session_state["session_id"]
+    # unieke key voor cache
+    return f"added_decks_{hashlib.md5(user_name.encode()).hexdigest()}"
+
+def load_user_decks():
+    key = get_user_deck_key()
+    decks = cache.get(key)
+    if decks is None:
+        decks = []
+    st.session_state.setdefault("added_decks", decks)
+    return decks
+
+def save_user_decks():
+    key = get_user_deck_key()
+    cache[key] = st.session_state.get("added_decks", [])
 
 # ------------------ Cache Setup ------------------
 import tempfile
@@ -399,10 +426,7 @@ with st.sidebar:
             user_deck_key = f"added_decks_{st.session_state['user_name'].lower()}"
 
             # Decks van deze gebruiker uit cache halen
-            if user_deck_key in cache:
-                st.session_state["added_decks"] = cache[user_deck_key]
-            else:
-                st.session_state["added_decks"] = []
+            load_user_decks()
 
             # Deck opties vullen
             deck_options = {}
@@ -423,11 +447,12 @@ with st.sidebar:
                     new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
                     if new_deck_id not in st.session_state["added_decks"]:
                         st.session_state["added_decks"].append(new_deck_id)
-                        cache[user_deck_key] = st.session_state["added_decks"]
+                        save_user_decks()  # <-- voeg deze regel toe
                     st.session_state["deck_options"][new_deck_name] = new_deck_id
                     st.success(f"Deck '{new_deck_name}' toegevoegd.")
                 else:
                     st.error("Ongeldige Archidekt Deck ID.")
+
 
             # Deck selecteren
             st.session_state["selected_deck_name"] = st.selectbox(
@@ -484,7 +509,7 @@ with st.sidebar:
                         deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
                         if deck_id_to_remove in st.session_state["added_decks"]:
                             st.session_state["added_decks"].remove(deck_id_to_remove)
-                            cache[user_deck_key] = st.session_state["added_decks"]
+                            save_user_decks()
                         st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
                         st.session_state["reset_delete_deck_checkbox"] = True
                         st.rerun()
