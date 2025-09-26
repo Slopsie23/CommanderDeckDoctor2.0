@@ -231,7 +231,14 @@ for key, default in {
     'sheriff_active': False
 }.items():
     st.session_state.setdefault(key, default)
-    
+
+# ------------------ User Decks Init ------------------
+if "user_name" in st.session_state and st.session_state["user_name"]:
+    load_user_decks()
+    deck_box_cards = cache.get(get_user_deck_key() + "_cards")
+    if deck_box_cards:
+        st.session_state["deck_box"] = deck_box_cards
+   
 # ------------------ User-specific Deck Cache ------------------
 import hashlib
 import uuid
@@ -347,14 +354,15 @@ def order_colors_wubrg(colors_set):
     order = {c: i for i, c in enumerate(WUBRG_ORDER)}
     return "".join(sorted(list(colors_set), key=lambda c: order.get(c, 99)))
 
-# ------------------ Render Cards With Add (altijd vaste kolommen) ------------------
 def render_cards_with_add(cards, columns=None):
-    """Render kaarten in een grid met hover-effect en gecentreerde Add-to-Deck knop."""
+    """Render kaarten in een grid met hover-effect en gecentreerde Add-to-Deck knop.
+       Toegevoegde kaarten worden per gebruiker persistent opgeslagen."""
+    
     if not cards:
         st.info("Geen kaarten om weer te geven.")
         return
 
-    # gebruik de waarde uit de slider in de sidebar (default 6)
+    # Kolommen bepalen
     if columns is None:
         columns = st.session_state.get("cards_per_row", 6)
 
@@ -362,9 +370,8 @@ def render_cards_with_add(cards, columns=None):
         row_cards = cards[i:i+columns]
         cols = st.columns(columns)  # altijd gekozen aantal kolommen
 
-        # vul alleen zoveel kolommen als er kaarten zijn
-        for col, card in zip(cols, row_cards):
-            with col:
+        for col_idx, card in enumerate(row_cards):
+            with cols[col_idx]:
                 img_url = card.get("image_uris", {}).get("normal") or \
                           card.get("card_faces", [{}])[0].get("image_uris", {}).get("normal") or \
                           "https://via.placeholder.com/223x310?text=Geen+afbeelding"
@@ -379,12 +386,23 @@ def render_cards_with_add(cards, columns=None):
                 """, unsafe_allow_html=True)
 
                 # Unieke key per kaart
-                button_key = f"add_{card.get('id', name)}"
+                button_key = f"add_card_{card.get('id', name)}"
 
                 if st.button("✚", key=button_key, help="Voeg toe aan Deck-Box"):
+                    # per-gebruiker Deck-Box laden
+                    if "deck_box" not in st.session_state:
+                        st.session_state["deck_box"] = []
+
+                    # checken of kaart al toegevoegd is
                     if name not in [c["name"] for c in st.session_state["deck_box"]]:
                         st.session_state["deck_box"].append(card)
+
+                        # persistente opslag per gebruiker in cache
+                        user_deck_key = get_user_deck_key()  # hergebruik helper uit eerdere stap
+                        cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
+
                         st.toast(f"{name} toegevoegd aan Deck-Box ✅")
+
 
 def get_all_keywords():
     keywords = [
@@ -423,10 +441,11 @@ with st.sidebar:
         ).strip()
 
         if st.session_state["user_name"]:
-            user_deck_key = f"added_decks_{st.session_state['user_name'].lower()}"
-
-            # Decks van deze gebruiker uit cache halen
+            # Decks en Deck-Box van deze gebruiker laden
             load_user_decks()
+            deck_box_cards = cache.get(get_user_deck_key() + "_cards")
+            if deck_box_cards:
+                st.session_state["deck_box"] = deck_box_cards
 
             # Deck opties vullen
             deck_options = {}
@@ -707,7 +726,12 @@ if st.session_state.get("show_deck_box_in_main", False):
                             c for c in st.session_state.get("deck_box", [])
                             if c.get("id", c.get("name")) != card.get("id", name)
                         ]
+                        # persistente opslag bijwerken
+                        user_deck_key = get_user_deck_key()
+                        cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
+
                         st.session_state["show_deck_box_in_main"] = True
+                        st.toast(f"{name} verwijderd uit Deck-Box ❌")
 
             # de overige lege kolommen blijven vanzelf leeg
 
