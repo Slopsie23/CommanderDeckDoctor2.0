@@ -184,10 +184,12 @@ for key, default in {
 }.items():
     st.session_state.setdefault(key, default)
 
+
 # ------------------ Activeer app_started bij tab ------------------
 active_tab = st.query_params.get("tab", [""])[0]
 if active_tab:
     st.session_state.app_started = True
+
 # ------------------ User-specific Deck Helpers ------------------
 def get_user_deck_key():
     """Genereer een unieke sleutel per gebruiker op basis van naam of sessie-ID"""
@@ -204,10 +206,13 @@ def load_user_decks():
     if decks is not None:
         st.session_state["added_decks"] = decks
         return decks
-
     os.makedirs("data", exist_ok=True)
     json_file = os.path.join("data", f"{key}.json")
 
+
+    # fallback naar JSON
+    os.makedirs("data", exist_ok=True)
+    json_file = os.path.join("data", f"{key}.json")
     if os.path.exists(json_file):
         try:
             with open(json_file, "r", encoding="utf-8") as f:
@@ -245,6 +250,21 @@ if active_tab:
 # --- Landingpagina ---
 if not st.session_state.get("app_started", False) and active_tab == "":
     st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
+    """Sla huidige user decks op in cache én JSON"""
+    key = get_user_deck_key()
+    decks = st.session_state.get("added_decks", [])
+    cache[key] = decks
+    os.makedirs("data", exist_ok=True)
+    json_file = os.path.join("data", f"{key}.json")
+    try:
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(decks, f, indent=2)
+    except Exception as e:
+        st.error(f"Fout bij opslaan van decks: {e}")
+        
+# ---------------- Landingpagina ----------------
+if not st.session_state.app_started:
+    # Sidebar verbergen
     st.markdown("""
     <style>
     .landing-container {
@@ -521,7 +541,6 @@ def add_to_deck_box(card):
         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
         st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
 
-
 def remove_from_deck_box(card):
     """Verwijder kaart uit Deck-Box en update persistente opslag"""
     st.session_state["deck_box"] = [
@@ -651,7 +670,8 @@ with st.sidebar:
     except:
         st.warning("Logo niet gevonden. Upload '12.png'.")
 
-    with st.expander("Decks", expanded=False):
+    with st.expander("Deck", expanded=False):
+
         # Zorg dat de map 'data' altijd bestaat
         os.makedirs("data", exist_ok=True)
 
