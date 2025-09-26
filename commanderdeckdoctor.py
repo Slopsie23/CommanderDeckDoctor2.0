@@ -234,11 +234,29 @@ for key, default in {
 
 # ------------------ User Decks Init ------------------
 if "user_name" in st.session_state and st.session_state["user_name"]:
-    load_user_decks()
-    deck_box_cards = cache.get(get_user_deck_key() + "_cards")
+    user_deck_key = get_user_deck_key()
+    
+    # 1. Probeer decks uit cache te halen
+    cached_decks = cache.get(user_deck_key)
+    if cached_decks is not None:
+        st.session_state["added_decks"] = cached_decks
+    else:
+        # 2. Fallback: probeer JSON bestand
+        json_file = os.path.join("data", f"{user_deck_key}.json")
+        if os.path.exists(json_file):
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    st.session_state["added_decks"] = json.load(f)
+            except Exception:
+                st.session_state["added_decks"] = []
+        else:
+            st.session_state["added_decks"] = []
+
+    # 3. Laad kaarten in de Deck-Box
+    deck_box_cards = cache.get(user_deck_key + "_cards")
     if deck_box_cards:
         st.session_state["deck_box"] = deck_box_cards
-   
+
 # ------------------ User-specific Deck Cache ------------------
 import hashlib
 import uuid
@@ -264,7 +282,17 @@ def load_user_decks():
 
 def save_user_decks():
     key = get_user_deck_key()
-    cache[key] = st.session_state.get("added_decks", [])
+    decks = st.session_state.get("added_decks", [])
+    
+    # opslaan in cache
+    cache[key] = decks
+    
+    # extra fallback: opslaan in JSON
+    os.makedirs("data", exist_ok=True)
+    json_file = os.path.join("data", f"{key}.json")
+    with open(json_file, "w", encoding="utf-8") as f:
+        json.dump(decks, f, ensure_ascii=False, indent=2)
+
 
 # ------------------ Cache Setup ------------------
 import tempfile
@@ -538,7 +566,6 @@ with st.sidebar:
                         st.rerun()
         else:
             st.info("Vul eerst je gebruikersnaam in om decks te beheren.")
-
 
 # ------------------ Helper: Multiselect auto-close ------------------
 def close_multiselect_on_select(widget_key: str):
