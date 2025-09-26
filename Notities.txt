@@ -1,0 +1,35 @@
+sep fixes:
+- Ketch-Up opnieuw maken en toevoegen
+- IPad OS 15 geeft code en geen weergaves
+- ui verfijnen
+- adaptieve breedte kaartweergaves fixen.
+- weergave opties door user:
+	- kleur
+- hoover strak om kaart heen in plaats van opvullen van de rij
+
+
+Latere functies toevoegen:
+- deck delen met een buddy, hij/zij kan dan kaarten taggen voor jou. Als in deck advies
+- Tag een kaart als 'all-star' waardoor het systeem leert wat jij leuk vind in je deck en specifieker advies kan geven, Of meerdere kaarten om een beter beeld te krijgen (go to cards)
+- 'Sell deck now's knop. Zet hij alles op Cardmarket
+- alle tekst in de frontend van de app moet in het engels zijn
+- add selected cards to Cardmarket wantslist > kan ook met copy clipboard
+- getoonde versies van deck met juiste kaartversie zoals op archidect
+- import deck ook uit tappedout en moxfield?
+- API met cardmarket
+- Kaarten slepen naar deckbox > verzamelt de kaarten voor de export
+- maak: klik op kaart = geselecteerd > glow effect blijft staan > nog een keer klikken = deselecteren en glow effect zoals bij de hoover gaat weg. > onthoud alle geselecteerde kaarten gedurende de sessie > maak een knopje "export"> maak een export van alle geselecteerde kaarten middels kopiëren naar clipboard
+
+UI	User Interface	Wat de gebruiker ziet
+UX	User Experience	Hoe de gebruiker het ervaart
+
+
+
+Mijn volledige appcode: 
+[plak hier je code]
+
+Voer alleen deze wijziging uit:
+[beschrijf exact wat je wilt toevoegen of veranderen]
+
+Gebruik de bestaande code als basis. Verander niets anders.  
+Geef me de **hele aangepaste code** terug, volledig werkend in Streamlit.
