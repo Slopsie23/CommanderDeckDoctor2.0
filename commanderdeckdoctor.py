@@ -1259,9 +1259,6 @@ if start_btn:
                     filtered_results.append(card)
         results = list({c['id']: c for c in filtered_results}.values())
 
-    if st.session_state.get('deck_loaded', False) and not deck_include:
-        results = [c for c in results if c['name'].lower() not in deck_card_names]
-
     # Filter op rarity
     if rarity_filter != "All" and results:
         results = [c for c in results if c.get("rarity", "").lower() == rarity_filter.lower()]
