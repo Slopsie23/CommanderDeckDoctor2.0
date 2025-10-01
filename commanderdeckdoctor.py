@@ -54,15 +54,15 @@ def get_user_deck_key():
     return f"added_decks_{hashlib.md5(user_name.encode()).hexdigest()}"
 
 def load_user_decks():
-    """Laad decks voor de huidige gebruiker uit cache of JSON-bestand"""
     key = get_user_deck_key()
     decks = cache.get(key)
     if decks is not None:
         st.session_state["added_decks"] = decks
         return decks
-    # fallback naar JSON
+
     os.makedirs("data", exist_ok=True)
     json_file = os.path.join("data", f"{key}.json")
+
     if os.path.exists(json_file):
         try:
             with open(json_file, "r", encoding="utf-8") as f:
@@ -71,21 +71,23 @@ def load_user_decks():
                 return decks
         except Exception:
             pass
+
     st.session_state["added_decks"] = []
     return []
 
 def save_user_decks():
-    """Sla huidige user decks op in cache én JSON"""
     key = get_user_deck_key()
     decks = st.session_state.get("added_decks", [])
-    cache[key] = decks
+    cache.set(key, decks)
     os.makedirs("data", exist_ok=True)
+
     json_file = os.path.join("data", f"{key}.json")
     try:
         with open(json_file, "w", encoding="utf-8") as f:
-            json.dump(decks, f, indent=2)
+            json.dump(decks, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Fout bij opslaan van decks: {e}")
+
         
 # ------------------ Globale CSS voor buttons en expanders ------------------
 st.markdown("""
