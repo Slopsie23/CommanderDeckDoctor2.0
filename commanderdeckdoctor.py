@@ -41,6 +41,12 @@ st.markdown("""
 }
 
 /* ---------------- Groene hoofdbuttons ---------------- */
+div.stButton {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+}
+
 div.stButton > button {
     border-radius: 12px !important;
     background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a) !important;
@@ -53,38 +59,35 @@ div.stButton > button {
     margin-top: 12px;
     box-shadow: 0 4px 10px rgba(59,124,59,0.5);
     transition: all 0.3s ease-in-out;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
 }
 div.stButton > button:hover {
     transform: scale(1.05) rotate(0deg) !important;
     box-shadow: 0 0 15px rgba(59,124,59,0.5), 0 6px 15px rgba(59,124,59,0.3) !important;
     background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
 }
-
 /* ---------------- Toggle-buttons Bear/Ketchup/Set/Sheriff ---------------- */
 .toggle-button button { 
-    width: 60px !important;
-    height: 60px !important;
-    border-radius: 12px !important;
-    font-size: 24px !important;
-    font-weight: bold !important;
-    cursor: pointer;
-    border: 2px solid rgba(255,255,255,0.2) !important;
-    transition: all 0.3s ease-in-out;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    margin: 4px auto !important;
-    background-color: rgba(255,255,255,0) !important; /* transparant */
-    color: white !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    width: 60px !important; 
+    height: 60px !important; 
+    border-radius: 12px !important; 
+    font-size: 24px !important; 
+    font-weight: bold !important; 
+    cursor: pointer !important; 
+    border: none !important; 
+    transition: all 0.2s ease-in-out; 
+    text-align: center; 
+    margin: 4px; 
+
+    /* Expander header look */
+    background: linear-gradient(135deg, #150f30, #001900) !important; 
+    color: white !important; 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
 }
+
 .toggle-button button:hover {
     transform: scale(1.05) !important;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.3) !important;
-    border-color: rgba(255,255,255,0.4) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important;
+    background: linear-gradient(135deg, #1a1a1a, #002200) !important;
 }
 
 /* ---------------- Expander headers ---------------- */
@@ -138,32 +141,20 @@ summary svg, summary [data-testid="stExpanderSummaryIcon"], summary .css-1f3x4kx
     fill: white !important;
 }
 
-/* Expander inhoud compact */
-div[data-testid="stExpander"] > details > div,
-div.st-expanderContent,
-div.streamlit-expanderContent,
-div[data-testid="stExpander"] > details > div[data-testid="stExpanderContent"] {
-    background-color: #111127 !important;
-    padding: 6px 10px !important;
-    border-radius: 0 0 8px 8px !important;
-    margin-top: 4px !important;
-    margin-bottom: 4px !important;
-    color: #e6efe6 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 2px !important;
-}
-
-/* Subtiele scheiding header/content */
-div[data-testid="stExpander"] > details > div {
-    border-top: 1px solid rgba(255,255,255,0.03) !important;
-}
-
-/* Ruimte tussen meerdere expanders in sidebar verwijderen */
-div[data-testid="stSidebar"] div[data-testid="stExpander"] {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+/* -------- Labels compacter boven widgets -------- */
+.stTextInput label, 
+.stSelectbox label, 
+.stMultiSelect label, 
+.stCheckbox label, 
+.stRadio label, 
+.stSlider label {
+    margin-bottom: 2px !important;
     padding-bottom: 0 !important;
+}
+
+/* Verticale blokken compacter */
+div[data-testid="stVerticalBlock"] {
+    gap: 0.25rem !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1303,6 +1294,32 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
     st.session_state.setdefault("zoekset_active", False)
 
     with st.sidebar:
+        # CSS voor toggle-buttons als expander headers
+        st.markdown("""
+        <style>
+        .toggle-button button { 
+            width: 60px !important; 
+            height: 60px !important; 
+            border-radius: 12px !important; 
+            font-size: 24px !important; 
+            font-weight: bold !important; 
+            cursor: pointer !important; 
+            border: none !important; 
+            transition: all 0.2s ease-in-out; 
+            text-align: center; 
+            margin: 4px; 
+            background: linear-gradient(135deg, #150f30, #001900) !important; 
+            color: white !important; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+        }
+        .toggle-button button:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important;
+            background: linear-gradient(135deg, #1a1a1a, #002200) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         # Container met class toggle-button zodat CSS automatisch wordt toegepast
         st.markdown('<div class="toggle-button">', unsafe_allow_html=True)
 
@@ -1341,99 +1358,129 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
                 st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
-       # ------------------ Zoek Set actie ------------------
-    if st.session_state.get("zoekset_active", False):
-        spinner_ph = show_mana_spinner("Sets ophalen...")
-        sets_data = safe_api_call("https://api.scryfall.com/sets")
-        spinner_ph.empty()
 
-        if sets_data and "data" in sets_data:
-            # Categorieën
+# ------------------ Zoek Set actie met onafhankelijke zoekfunctie ------------------
+if st.session_state.get("zoekset_active", False):
+    spinner_ph = show_mana_spinner("Get your Sets Straight...")
+    sets_data = safe_api_call("https://api.scryfall.com/sets")
+    spinner_ph.empty()
+
+    if sets_data and "data" in sets_data:
+        all_sets = sets_data["data"]
+
+        # 1. Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
+        search_term = st.text_input("Zoek op Setnaam")
+
+        # 2. Filter sets op zoekterm, volledig onafhankelijk van categorieën
+        if search_term:
+            sets_list = [
+                s for s in all_sets
+                if not s.get("digital", False) and search_term.lower() in s.get("name", "").lower()
+            ]
+        else:
+            # Als er geen zoekterm is, filter op categorieën
             set_type_options = {
+                "all": "All Sets",
                 "main": "Main Sets",
                 "commander": "Commander",
                 "special": "Specials"
             }
-
-            # Default = Main Sets
             selected_types = st.multiselect(
-                "Selecteer Set Categories", list(set_type_options.values()), default=["Main Sets"]
+                "Selecteer Set Categorie", list(set_type_options.values()), default=["Main Sets"]
             )
 
-            # Filter de sets
             sets_list = []
-            for s in sets_data["data"]:
-                set_type = s.get("set_type","").lower()
-
-                if "Main Sets" in selected_types and set_type in ["core","expansion"]:
+            for s in all_sets:
+                if s.get("digital", False):
+                    continue  # alleen paper
+                set_type = s.get("set_type", "").lower()
+                if "All Sets" in selected_types:
                     sets_list.append(s)
-                elif "Commander" in selected_types and set_type == "commander":
-                    sets_list.append(s)
-                elif "Specials" in selected_types and set_type in ["masters","funny","promo","draft_innovation","planechase"]:
-                    sets_list.append(s)
+                else:
+                    if "Main Sets" in selected_types and set_type in ["core", "expansion"]:
+                        sets_list.append(s)
+                    elif "Commander" in selected_types and set_type == "commander":
+                        sets_list.append(s)
+                    elif "Specials" in selected_types and set_type in ["masters","funny","promo","draft_innovation","planechase"]:
+                        sets_list.append(s)
 
-            # Sorteren van nieuw naar oud
-            sets_list.sort(key=lambda s: s.get("released_at", "1900-01-01"), reverse=True)
+        # 3. Sorteren van nieuw naar oud
+        sets_list.sort(key=lambda s: s.get("released_at", "1900-01-01"), reverse=True)
 
-            st.subheader(f"Paper MTG Sets gevonden: {len(sets_list)}")
+        st.subheader(f"Paper MTG Sets gevonden: {len(sets_list)}")
 
-            cols_per_row = 8
-            row_cols = []
+        cols_per_row = 8
+        row_cols = []
 
-            # CSS voor groene logos, subtiele glow en padding zodat logo niet wordt afgesneden
-            st.markdown("""
-                <style>
-                .logo-green {
-                    filter: invert(40%) sepia(100%) saturate(500%) hue-rotate(90deg);
-                    transition: all 0.2s ease-in-out;
-                    width: 64px;
-                    height: 64px;
-                    display: block;
-                    margin-left: auto;
-                    margin-right: auto;
-                    border-radius: 50%;
-                    padding: 4px; /* extra ruimte voor glow */
-                    background-color: transparent;
-                }
-                .logo-green:hover {
-                    filter: invert(40%) sepia(100%) saturate(700%) hue-rotate(90deg) brightness(1.2);
-                    box-shadow: 0 0 10px 4px rgba(211, 40, 118, 0.6); /* subtiele glow */
-                }
-                .set-name {
-                    text-align: center;
-                    color: white;
-                    font-size: 14px;
-                    margin: 4px 0 0 0;
-                    overflow: hidden;
-                    white-space: nowrap;
-                    text-overflow: ellipsis;
-                }
-                .set-code {
-                    text-align: center;
-                    font-size: 12px;
-                    color: gray;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+        # 4. CSS voor set container, logo, naam en hover
+        st.markdown("""
+        <style>
+        .set-container {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .logo-green {
+            filter: invert(40%) sepia(100%) saturate(500%) hue-rotate(90deg);
+            transition: all 0.2s ease-in-out;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            padding: 4px;
+            background-color: transparent;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 8px;
+        }
+        .set-name {
+            color: white;
+            font-size: 14px;
+            margin: 6px 0 2px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .set-code {
+            color: gray;
+            font-size: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease-in-out;
+        }
+        .set-container:hover .logo-green {
+            filter: invert(40%) sepia(100%) saturate(700%) hue-rotate(90deg) brightness(1.2);
+            box-shadow: 0 0 10px 4px rgba(0,255,0,0.8);
+            transform: scale(1.15);
+        }
+        .set-container:hover .set-code {
+            color: #00ff00;
+            font-size: 12px;
+            text-shadow: 0 0 6px #00ff00;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-            for i, s in enumerate(sets_list):
-                code = s.get("code", "").upper()
-                name = s.get("name", "Onbekend")
-                logo_url = s.get("icon_svg_uri", None)
+        # 5. Render sets per rij van 8
+        for i, s in enumerate(sets_list):
+            code = s.get("code", "").upper()
+            name = s.get("name", "Onbekend")
+            logo_url = s.get("icon_svg_uri", None)
 
-                # Nieuwe rij voor elke 8 sets
-                if i % cols_per_row == 0:
-                    row_cols = st.columns(cols_per_row)
+            if i % cols_per_row == 0:
+                row_cols = st.columns(cols_per_row)
 
-                col = row_cols[i % cols_per_row]
-                with col:
-                    if logo_url:
-                        st.markdown(f'<img src="{logo_url}" class="logo-green" alt="{name}">', unsafe_allow_html=True)
-                    st.markdown(f'<div class="set-name">{name}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="set-code">[{code}]</div>', unsafe_allow_html=True)
+            col = row_cols[i % cols_per_row]
+            with col:
+                html = f"""
+                <div class="set-container">
+                    <img src="{logo_url}" class="logo-green" alt="{name}">
+                    <div class="set-name">{name}</div>
+                    <div class="set-code">[{code}]</div>
+                </div>
+                """
+                st.markdown(html, unsafe_allow_html=True)
 
-        else:
-            st.error("Geen sets gevonden.")
+    else:
+        st.error("Geen sets gevonden.")
 
     # ------------------ Ketchup actie ------------------
     if st.session_state["ketchup_active"]:
