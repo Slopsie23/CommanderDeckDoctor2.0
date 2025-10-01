@@ -21,6 +21,153 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+# ------------------ Globale CSS voor CommanderDeckDoctor ------------------
+st.markdown("""
+<style>
+/* ---------------- App achtergrond ---------------- */
+.stApp { 
+    background: linear-gradient(135deg, #150f30, #001900); 
+    color: white; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+}
+
+/* ---------------- Sidebar transparant (glass) ---------------- */
+[data-testid="stSidebar"] {
+    background-color: rgba(17,17,39,0.5) !important;
+    backdrop-filter: blur(8px);
+    border-right: none !important;
+    box-shadow: none !important;
+    color: white !important;
+}
+
+/* ---------------- Groene hoofdbuttons ---------------- */
+div.stButton > button {
+    border-radius: 12px !important;
+    background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a) !important;
+    color: white !important;
+    font-size: 22px !important;
+    font-weight: bold !important;
+    padding: 10px 24px !important;
+    border: none !important;
+    cursor: pointer;
+    margin-top: 12px;
+    box-shadow: 0 4px 10px rgba(59,124,59,0.5);
+    transition: all 0.3s ease-in-out;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+div.stButton > button:hover {
+    transform: scale(1.05) rotate(0deg) !important;
+    box-shadow: 0 0 15px rgba(59,124,59,0.5), 0 6px 15px rgba(59,124,59,0.3) !important;
+    background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
+}
+
+/* ---------------- Toggle-buttons Bear/Ketchup/Set/Sheriff ---------------- */
+.toggle-button button { 
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: 12px !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.2) !important;
+    transition: all 0.3s ease-in-out;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin: 4px auto !important;
+    background-color: rgba(255,255,255,0) !important; /* transparant */
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.toggle-button button:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.3) !important;
+    border-color: rgba(255,255,255,0.4) !important;
+}
+
+/* ---------------- Expander headers ---------------- */
+div[data-testid="stExpander"] > details > summary,
+summary.st-expanderHeader,
+summary[class*="st-expanderHeader"],
+div.streamlit-expanderHeader,
+div.st-expanderHeader,
+details > summary {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.3rem !important;
+    background: linear-gradient(to right, #111127, #011901) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    transition: all 0.25s ease-in-out !important;
+    cursor: pointer !important;
+    list-style: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Hover effect expander header */
+div[data-testid="stExpander"] > details > summary:hover,
+summary.st-expanderHeader:hover,
+summary[class*="st-expanderHeader"]:hover,
+div.streamlit-expanderHeader:hover,
+details > summary:hover {
+    transform: scale(1.02) !important;
+    background: linear-gradient(to right, #011901, #111127) !important;
+    box-shadow: 0 3px 8px rgba(59,124,59,0.2) !important;
+}
+
+/* Open expander: top corners rond, bottom corners recht */
+div[data-testid="stExpander"] > details[open] > summary,
+details[open] > summary {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* Marker wit */
+summary::marker { color: white !important; font-size: 16px !important; }
+summary::-webkit-details-marker { color: white !important; font-size: 16px !important; }
+summary svg, summary [data-testid="stExpanderSummaryIcon"], summary .css-1f3x4kx {
+    color: white !important;
+    fill: white !important;
+}
+
+/* Expander inhoud compact */
+div[data-testid="stExpander"] > details > div,
+div.st-expanderContent,
+div.streamlit-expanderContent,
+div[data-testid="stExpander"] > details > div[data-testid="stExpanderContent"] {
+    background-color: #111127 !important;
+    padding: 6px 10px !important;
+    border-radius: 0 0 8px 8px !important;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+    color: #e6efe6 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+/* Subtiele scheiding header/content */
+div[data-testid="stExpander"] > details > div {
+    border-top: 1px solid rgba(255,255,255,0.03) !important;
+}
+
+/* Ruimte tussen meerdere expanders in sidebar verwijderen */
+div[data-testid="stSidebar"] div[data-testid="stExpander"] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ------------------ Logging ------------------
 logging.basicConfig(level=logging.INFO)
 # ------------------ DiskCache Init ------------------
@@ -88,69 +235,6 @@ def save_user_decks():
     except Exception as e:
         st.error(f"Fout bij opslaan van decks: {e}")
 
-        
-# ------------------ Globale CSS voor buttons en expanders ------------------
-st.markdown("""
-<style>
-/* Startknop styling */
-div.stButton > button {
-    border-radius: 12px !important;               /* minder ovaal */
-    background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a) !important;
-    color: white !important;
-    font-size: 22px !important;                   /* iets kleiner */
-    font-weight: bold !important;
-    padding: 10px 24px !important;               /* compacter */
-    border: none !important;
-    cursor: pointer;
-    margin-top: 12px;
-    box-shadow: 0 4px 10px rgba(59,124,59,0.5);  /* subtieler */
-    transition: all 0.3s ease-in-out;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-div.stButton > button:hover {
-    transform: scale(1.05) rotate(0deg);          /* subtiele hover */
-    box-shadow: 0 0 15px rgba(59,124,59,0.7), 0 6px 15px rgba(59,124,59,0.5);
-    background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
-}
-
-
-/* Expander header styling */
-div.st-expander > button {
-    background-color: #3b7c3b !important; /* groene kleur van set-logos */
-    color: white !important;
-    font-weight: bold;
-    border-radius: 8px !important;
-    padding: 8px 12px !important;
-    transition: all 0.3s ease-in-out;
-}
-
-/* Hover + pulse animatie */
-div.st-expander > button:hover {
-    animation: pulse 1.5s infinite;
-    transform: scale(1.02);
-    background-color: #5a995a !important;
-}
-
-/* Puls keyframes */
-@keyframes pulse {
-    0% { box-shadow: 0 0 5px rgba(59,124,59,0.4); }
-    50% { box-shadow: 0 0 15px rgba(59,124,59,0.7); }
-    100% { box-shadow: 0 0 5px rgba(59,124,59,0.4); }
-}
-
-/* Expander inhoud */
-div.st-expander > div[data-testid="stExpanderContent"] {
-    background-color: #1f2d1f !important;
-    padding: 8px 12px !important;
-    border-radius: 0 0 8px 8px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
 # ------------------ Landingpagina ------------------
 if not st.session_state.get("app_started", False):
     # Sidebar verbergen
@@ -164,8 +248,8 @@ if not st.session_state.get("app_started", False):
         justify-content: flex-start;
         align-items: center;
         min-height: 00vh;
-        padding-top: 50px;
-        padding-bottom: 40px;
+        padding-top: 00px;
+        padding-bottom: 00px;
         background: radial-gradient(circle at top left, #150f30, #001900);
         color: white;
         text-align: center;
@@ -752,12 +836,6 @@ with st.sidebar.expander("Search & Find", expanded=False):
     # ---------------- Submit Button ----------------
     start_btn = st.button("Show Results")
 
-    # ---------------- Sort Option ----------------
-    sort_option = st.selectbox(
-        "Sort Results:",
-        ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
-         "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
-    )
 # Controleer of er iets is ingevuld/geklikt in de analyse-sectie
 user_changed_input = (
     bool(set_filter.strip()) or
@@ -811,7 +889,12 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
         step=1,
         help="Kies hoeveel kaarten je naast elkaar wilt zien in de resultaten"
     )
-
+    # ---------------- Sort Option ----------------
+    sort_option = st.selectbox(
+        "Sort Results:",
+        ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
+         "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
+    )
 # ------------------ OVERRIDE: Als Deck-Box open is, toon alléén Deck-Box ------------------
 if st.session_state.get("show_deck_box_in_main", False):
     deck_box = st.session_state.get("deck_box", [])
@@ -1206,41 +1289,29 @@ if start_btn:
 # ------------------ Bear Search, Zoek set, Sheriff & Ketchup ------------------
 def bear_and_sheriff_toggle(selected_deck_name=None):
     deck_changed = selected_deck_name is not None and selected_deck_name != st.session_state.get('selected_deck_name', '')
-    any_toggle_changed = (st.session_state.get('show_deck') or st.session_state.get('alt_commander_toggle') or st.session_state.get('start_analysis'))
+    any_toggle_changed = (
+        st.session_state.get('show_deck') or 
+        st.session_state.get('alt_commander_toggle') or 
+        st.session_state.get('start_analysis')
+    )
     if st.session_state.get('bear_search_active', False) and (deck_changed or any_toggle_changed):
         st.session_state['bear_search_active'] = False
     if deck_changed:
         st.session_state['selected_deck_name'] = selected_deck_name
         load_deck(selected_deck_name)
+
     st.session_state.setdefault("bear_search_active", False)
     st.session_state.setdefault("sheriff_active", False)
     st.session_state.setdefault("ketchup_active", False)
     st.session_state.setdefault("zoekset_active", False)
 
     with st.sidebar:
-        st.markdown(
-            """
-            <style>
-            .toggle-button button { 
-                   width: 60px !important; 
-                   height: 60px !important; 
-                   border-radius: 12px !important; 
-                   font-size: 24px !important; 
-                   font-weight: bold !important; 
-                   cursor: pointer; 
-                   border: none !important; 
-                   transition: all 0.2s ease-in-out; 
-                   display: flex !important;             /* flex container */
-                   justify-content: center !important;   /* horizontaal centreren */
-                   align-items: center !important;       /* verticaal centreren */
-                   margin: 4px auto !important;          /* horizontaal centreren van de button zelf */
-            }
-            </style>
-            """, unsafe_allow_html=True
-        )
-        
-        col_empty_left, col_sets, col_ketchup, col_bear, col_sheriff, col_empty_right = st.columns([1, 1, 1, 1, 1, 1])
+        # Container met class toggle-button zodat CSS automatisch wordt toegepast
+        st.markdown('<div class="toggle-button">', unsafe_allow_html=True)
 
+        col_empty_left, col_sets, col_ketchup, col_bear, col_sheriff, col_empty_right = st.columns([1,1,1,1,1,1])
+
+        # --- Set Codes Toggle ---
         with col_sets:
             btn_label = "📚" if not st.session_state["zoekset_active"] else "❌"
             hover_text = "Zoek Set Codes" if not st.session_state["zoekset_active"] else "Sluit Set Codes"
@@ -1248,6 +1319,7 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
                 st.session_state["zoekset_active"] = not st.session_state["zoekset_active"]
                 st.rerun()
 
+        # --- Ketchup Toggle ---
         with col_ketchup:
             btn_label = "🍅" if not st.session_state["ketchup_active"] else "❌"
             hover_text = "Ketch-Up" if not st.session_state["ketchup_active"] else "I like Mayo"
@@ -1255,6 +1327,7 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
                 st.session_state["ketchup_active"] = not st.session_state["ketchup_active"]
                 st.rerun()
 
+        # --- Bear Toggle ---
         with col_bear:
             btn_label = "🐻" if not st.session_state["bear_search_active"] else "❌"
             hover_text = "Bear Hunt" if not st.session_state["bear_search_active"] else "No more Bears"
@@ -1262,13 +1335,15 @@ def bear_and_sheriff_toggle(selected_deck_name=None):
                 st.session_state["bear_search_active"] = not st.session_state["bear_search_active"]
                 st.rerun()
 
+        # --- Sheriff Toggle ---
         with col_sheriff:
             btn_label = "🌟" if not st.session_state["sheriff_active"] else "❌"
             hover_text = "Be the Sheriff" if not st.session_state["sheriff_active"] else "Shoot the Sheriff"
             if st.button(btn_label, key="sheriff_toggle_button", help=hover_text):
                 st.session_state["sheriff_active"] = not st.session_state["sheriff_active"]
                 st.rerun()
-       
+
+        st.markdown('</div>', unsafe_allow_html=True)
        # ------------------ Zoek Set actie ------------------
     if st.session_state.get("zoekset_active", False):
         spinner_ph = show_mana_spinner("Sets ophalen...")
