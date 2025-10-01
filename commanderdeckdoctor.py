@@ -181,6 +181,10 @@ for key, default in {
 }.items():
     st.session_state.setdefault(key, default)
 
+# ------------------ Activeer app_started bij tab ------------------
+active_tab = st.query_params.get("tab", [""])[0]
+if active_tab:
+    st.session_state.app_started = True
 # ------------------ User-specific Deck Helpers ------------------
 def get_user_deck_key():
     """Genereer een unieke sleutel per gebruiker op basis van naam of sessie-ID"""
@@ -226,69 +230,46 @@ def save_user_decks():
     except Exception as e:
         st.error(f"Fout bij opslaan van decks: {e}")
 
-# ------------------ Landingpagina ------------------
-if not st.session_state.get("app_started", False):
-    # Sidebar verbergen
-    st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
+# ------------------ Landingpagina & Tab Logic ------------------
+# Huidige tab ophalen
+params = st.query_params
+active_tab = params.get("tab", [""])[0]  # lege string als geen tab
 
+# Als een tab actief is, start de app automatisch
+if active_tab:
+    st.session_state.app_started = True
+
+# --- Landingpagina ---
+if not st.session_state.get("app_started", False) and active_tab == "":
+    st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
     st.markdown("""
     <style>
     .landing-container {
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: center;
-        min-height: 00vh;
-        padding-top: 00px;
-        padding-bottom: 00px;
+        display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+        padding-top: 0px; padding-bottom: 0px;
         background: radial-gradient(circle at top left, #150f30, #001900);
-        color: white;
-        text-align: center;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: white; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .landing-image {
-        max-width: 400px;
-        width: 90%;
-        border-radius: 16px;
-        box-shadow: 0 12px 25px rgba(0,0,0,0.5);
-        margin-bottom: 24px;
-        transition: transform 0.6s ease, box-shadow 0.6s ease;
-    }
-    .landing-image:hover {
-        transform: rotate(02deg) scale(1.05);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.7);
-    }
-    .landing-subtext {
-        font-size: 18px;
-        opacity: 0.85;
-        margin-top: 12px;
-        animation: fadeIn 1.2s ease-in-out;
-    }
-    @keyframes fadeIn {
-        from {opacity: 0; transform: translateY(20px);}
-        to {opacity: 0.85; transform: translateY(0);}
-    }
+    .landing-image { max-width: 400px; width: 90%; border-radius: 16px; box-shadow: 0 12px 25px rgba(0,0,0,0.5); margin-bottom: 24px; transition: transform 0.6s ease, box-shadow 0.6s ease; }
+    .landing-image:hover { transform: rotate(2deg) scale(1.05); box-shadow: 0 20px 40px rgba(0,0,0,0.7); }
+    .landing-subtext { font-size: 18px; opacity: 0.85; margin-top: 12px; animation: fadeIn 1.2s ease-in-out; }
+    @keyframes fadeIn { from {opacity: 0; transform: translateY(20px);} to {opacity: 0.85; transform: translateY(0);} }
     </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="landing-container">', unsafe_allow_html=True)
-
-    # Afbeelding tonen
     if os.path.exists("12.png"):
-        img = Image.open("12.png")
-        st.image(img, width=400)
+        st.image(Image.open("12.png"), width=400)
     else:
-        st.error("Afbeelding \'12.png\' niet gevonden.")
-
-    # Subtekst
+        st.error("Afbeelding '12.png' niet gevonden.")
     st.markdown('<div class="landing-subtext">Welkom bij CommanderDeckDoctor</div>', unsafe_allow_html=True)
 
-    # Startknop
     if st.button("Untap - Upkeep - Draw"):
-        st.session_state.app_started = True
+        st.session_state.app_started = True  # landing verlaten
 
     st.markdown('</div>', unsafe_allow_html=True)
-
+    st.stop()  # verdere code stopt hier zolang landing zichtbaar is
+    
 # ---------------- Hoofdapp ----------------
 else:
     # Sidebar zichtbaar
@@ -392,30 +373,13 @@ st.markdown("""
     text-shadow: 0 0 8px rgba(220,50,50,0.8);
 }
 
-/* ---------------- Footer ---------------- */
-.footer { 
-    position: fixed; 
-    left: 0; 
-    bottom: 0; 
-    width: 100%; 
-    background: linear-gradient(135deg, #0d141c, #001900);
-    color: white; 
-    text-align: center; 
-    padding: 6px 0; 
-    font-size: 14px; 
-    user-select: none; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    gap: 12px; 
-    z-index: 9999; 
-}
+# ------------------ Mana Spinner helper ------------------
 @keyframes mana-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes mana-counter { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
 .mana-spinner-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; margin: 12px 0 18px; }
 .mana-spinner { position: relative; width: 120px; height: 120px; border-radius: 50%; animation: mana-spin 3s linear infinite; }
-.mana { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; transform: rotate(calc(var(--i) * 72deg)) translate(50px) rotate(calc(-1 * var(--i) * 72deg)); transform-origin: center center; }
-.mana .face { width: 100%; height: 100%; animation: mana-counter 3s linear infinite; transition: animation-play-state 0.2s ease; }
+.mana { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; transform: rotate(calc(var(--i) * 72deg)) translate(50px); transform-origin: center center; }
+.mana .face { width: 100%; height: 100%; transform: rotate(calc(-1 * var(--i) * 72deg)); animation: mana-counter 3s linear infinite; transition: animation-play-state 0.2s ease; }
 .mana-spinner:hover .face { animation-play-state: paused; }
 .mana img { width: 100%; height: 100%; display:block; }
 .mana-msg { margin-top: 6px; font-size: 14px; opacity: 0.9; text-align:center; }
@@ -563,7 +527,8 @@ WUBRG_ORDER = "WUBRG"
 def order_colors_wubrg(colors_set):
     order = {c: i for i, c in enumerate(WUBRG_ORDER)}
     return "".join(sorted(list(colors_set), key=lambda c: order.get(c, 99)))
-
+    
+# ------------------ Render Cards helpers -----------------
 def render_cards_with_add(cards, columns=None):
     """Render kaarten in een grid met hover-effect en gecentreerde Add-to-Deck knop.
        Toegevoegde kaarten worden per gebruiker persistent opgeslagen."""
@@ -886,6 +851,230 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
         ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
          "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
     )
+# ------------------ VERREKES HENDIG Expander ------------------
+st.markdown("""
+<style>
+/* Sidebar toggle-buttons */
+.toggle-button button { 
+    width: 60px !important; 
+    height: 60px !important; 
+    border-radius: 12px !important; 
+    font-size: 24px !important; 
+    font-weight: bold !important; 
+    cursor: pointer !important; 
+    border: none !important; 
+    transition: all 0.25s ease-in-out; 
+    text-align: center; 
+    margin: 4px; 
+    background: linear-gradient(135deg, #150f30, #001900) !important; 
+    color: white !important; 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+}
+
+.toggle-button button:hover {
+    transform: scale(1.15) rotate(0deg) !important;
+    box-shadow: 0 0 12px rgba(0,255,0,0.8), 0 4px 8px rgba(0,0,0,0.7) !important;
+    background: linear-gradient(135deg, #1a1a1a, #002200) !important;
+}
+
+.toggle-button button:active {
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 8px rgba(0,255,0,0.5), 0 2px 6px rgba(0,0,0,0.5) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+def sidebar_toggle_expander():
+    """Plaats Bear / Set / Ketchup / Sheriff toggles in een sidebar-expander"""
+    st.session_state.setdefault("bear_search_active", False)
+    st.session_state.setdefault("sheriff_active", False)
+    st.session_state.setdefault("ketchup_active", False)
+    st.session_state.setdefault("zoekset_active", False)
+
+    with st.sidebar.expander("Verekkes Hendig", expanded=False):
+        col_sets, col_ketchup, col_bear, col_sheriff = st.columns(4)
+
+        # --- Set Codes Toggle ---
+        with col_sets:
+            btn_label = "📚" if not st.session_state["zoekset_active"] else "❌"
+            hover_text = "Zoek Set Codes" if not st.session_state["zoekset_active"] else "Sluit Set Codes"
+            if st.button(btn_label, key="sets_toggle_button", help=hover_text):
+                st.session_state.update({
+                    "zoekset_active": not st.session_state["zoekset_active"],
+                    "ketchup_active": False,
+                    "bear_search_active": False,
+                    "sheriff_active": False
+                })
+
+        # --- Ketchup Toggle ---
+        with col_ketchup:
+            btn_label = "🍅" if not st.session_state["ketchup_active"] else "❌"
+            hover_text = "Ketch-Up" if not st.session_state["ketchup_active"] else "Sluit Ketch-Up"
+            if st.button(btn_label, key="ketchup_toggle_button", help=hover_text):
+                st.session_state.update({
+                    "ketchup_active": not st.session_state["ketchup_active"],
+                    "zoekset_active": False,
+                    "bear_search_active": False,
+                    "sheriff_active": False
+                })
+
+        # --- Bear Toggle ---
+        with col_bear:
+            btn_label = "🐻" if not st.session_state["bear_search_active"] else "❌"
+            hover_text = "Bear Hunt" if not st.session_state["bear_search_active"] else "No more Bears"
+            if st.button(btn_label, key="bear_toggle_button", help=hover_text):
+                st.session_state.update({
+                    "bear_search_active": not st.session_state["bear_search_active"],
+                    "zoekset_active": False,
+                    "ketchup_active": False,
+                    "sheriff_active": False
+                })
+
+        # --- Sheriff Toggle ---
+        with col_sheriff:
+            btn_label = "🌟" if not st.session_state["sheriff_active"] else "❌"
+            hover_text = "Be the Sheriff" if not st.session_state["sheriff_active"] else "Sluit Sheriff"
+            if st.button(btn_label, key="sheriff_toggle_button", help=hover_text):
+                st.session_state.update({
+                    "sheriff_active": not st.session_state["sheriff_active"],
+                    "zoekset_active": False,
+                    "ketchup_active": False,
+                    "bear_search_active": False
+                })
+
+# ------------------ Active Toggle Render ------------------
+def render_active_toggle_results():
+    """Render alleen de actieve toggle in hoofdapp"""
+
+    # --- Zoek Set ---
+    if st.session_state.get("zoekset_active", False):
+        spinner_ph = show_mana_spinner("Get your Sets Straight...")
+        sets_data = safe_api_call("https://api.scryfall.com/sets")
+        spinner_ph.empty()
+
+        if sets_data and "data" in sets_data:
+            all_sets = sets_data["data"]
+
+            # 1. Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
+            search_term = st.text_input("Zoek op Setnaam")
+
+            # 2. Filter sets op zoekterm, volledig onafhankelijk van categorieën
+            if search_term:
+                sets_list = [
+                    s for s in all_sets
+                    if not s.get("digital", False) and search_term.lower() in s.get("name", "").lower()
+                ]
+            else:
+                set_type_options = {
+                    "all": "All Sets",
+                    "main": "Main Sets",
+                    "commander": "Commander",
+                    "special": "Specials"
+                }
+                selected_types = st.multiselect(
+                    "Selecteer Set Categorie", list(set_type_options.values()), default=["Main Sets"]
+                )
+                sets_list = []
+                for s in all_sets:
+                    if s.get("digital", False):
+                        continue
+                    set_type = s.get("set_type", "").lower()
+                    if "All Sets" in selected_types:
+                        sets_list.append(s)
+                    else:
+                        if "Main Sets" in selected_types and set_type in ["core", "expansion"]:
+                            sets_list.append(s)
+                        elif "Commander" in selected_types and set_type == "commander":
+                            sets_list.append(s)
+                        elif "Specials" in selected_types and set_type in ["masters","funny","promo","draft_innovation","planechase"]:
+                            sets_list.append(s)
+
+            # 3. Sorteren van nieuw naar oud
+            sets_list.sort(key=lambda s: s.get("released_at", "1900-01-01"), reverse=True)
+            st.subheader(f"Paper MTG Sets gevonden: {len(sets_list)}")
+
+            cols_per_row = 8
+            row_cols = []
+
+            # 4. CSS voor set container, logo, naam en hover
+            st.markdown("""
+            <style>
+            .set-container { text-align: center; margin-bottom: 16px; }
+            .logo-green {
+                filter: invert(40%) sepia(100%) saturate(500%) hue-rotate(90deg);
+                transition: all 0.2s ease-in-out;
+                width: 64px; height: 64px;
+                border-radius: 50%; padding: 4px;
+                background-color: transparent;
+                display: block; margin-left: auto; margin-right: auto; margin-bottom: 8px;
+            }
+            .set-name { color: white; font-size: 14px; margin: 6px 0 2px 0;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            }
+            .set-code { color: gray; font-size: 12px; margin-bottom: 8px;
+                transition: all 0.2s ease-in-out;
+            }
+            .set-container:hover .logo-green {
+                filter: invert(40%) sepia(100%) saturate(700%) hue-rotate(90deg) brightness(1.2);
+                box-shadow: 0 0 10px 4px rgba(0,255,0,0.8);
+                transform: scale(1.15);
+            }
+            .set-container:hover .set-code {
+                color: #00ff00; font-size: 12px; text-shadow: 0 0 6px #00ff00;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
+            # 5. Render sets per rij van 8
+            for i, s in enumerate(sets_list):
+                code = s.get("code", "").upper()
+                name = s.get("name", "Onbekend")
+                logo_url = s.get("icon_svg_uri", None)
+
+                if i % cols_per_row == 0:
+                    row_cols = st.columns(cols_per_row)
+                col = row_cols[i % cols_per_row]
+                with col:
+                    html = f"""
+                    <div class="set-container">
+                        <img src="{logo_url}" class="logo-green" alt="{name}">
+                        <div class="set-name">{name}</div>
+                        <div class="set-code">[{code}]</div>
+                    </div>
+                    """
+                    st.markdown(html, unsafe_allow_html=True)
+
+        else:
+            st.error("Geen sets gevonden.")
+
+    # --- Ketchup ---
+    elif st.session_state.get("ketchup_active", False):
+        st.info("🍅 Ketchup in actie... Even geduld!")
+        st.subheader("Ketchup Items:")
+        for item in ["Ketchup Card 1","Ketchup Card 2","Ketchup Card 3"]:
+            st.markdown(f"- {item}")
+
+    # --- Bear ---
+    elif st.session_state.get("bear_search_active", False):
+        spinner_ph = show_mana_spinner("Bears Incoming...")
+        bear_cards = scryfall_search_all_limited("art:bear", max_cards=250)
+        spinner_ph.empty()
+        st.subheader(f"Bears Found: ({len(bear_cards)})")
+        render_cards_with_add(bear_cards)
+
+    # --- Sheriff ---
+    elif st.session_state.get("sheriff_active", False):
+        try:
+            sheriff_img = Image.open("Sherrif - Commander.png")
+            st.image(sheriff_img, use_container_width=False)
+            st.markdown("<style>img[alt=''] {max-height:90vh; height:auto; width:auto;}</style>", unsafe_allow_html=True)
+        except:
+            st.error("Afbeelding 'Sherrif - Commander.png' niet gevonden.")
+
+# ------------------ Aanroepen ------------------
+sidebar_toggle_expander()
+render_active_toggle_results()
+
 # ------------------ OVERRIDE: Als Deck-Box open is, toon alléén Deck-Box ------------------
 if st.session_state.get("show_deck_box_in_main", False):
     deck_box = st.session_state.get("deck_box", [])
@@ -1274,260 +1463,28 @@ if start_btn:
     render_cards_with_add(results)
 
 
-# ------------------ Bear Search, Zoek set, Sheriff & Ketchup ------------------
-def bear_and_sheriff_toggle(selected_deck_name=None):
-    deck_changed = selected_deck_name is not None and selected_deck_name != st.session_state.get('selected_deck_name', '')
-    any_toggle_changed = (
-        st.session_state.get('show_deck') or 
-        st.session_state.get('alt_commander_toggle') or 
-        st.session_state.get('start_analysis')
-    )
-    if st.session_state.get('bear_search_active', False) and (deck_changed or any_toggle_changed):
-        st.session_state['bear_search_active'] = False
-    if deck_changed:
-        st.session_state['selected_deck_name'] = selected_deck_name
-        load_deck(selected_deck_name)
-
-    st.session_state.setdefault("bear_search_active", False)
-    st.session_state.setdefault("sheriff_active", False)
-    st.session_state.setdefault("ketchup_active", False)
-    st.session_state.setdefault("zoekset_active", False)
-
-    with st.sidebar:
-        # CSS voor toggle-buttons als expander headers
-        st.markdown("""
-        <style>
-        .toggle-button button { 
-            width: 60px !important; 
-            height: 60px !important; 
-            border-radius: 12px !important; 
-            font-size: 24px !important; 
-            font-weight: bold !important; 
-            cursor: pointer !important; 
-            border: none !important; 
-            transition: all 0.2s ease-in-out; 
-            text-align: center; 
-            margin: 4px; 
-            background: linear-gradient(135deg, #150f30, #001900) !important; 
-            color: white !important; 
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
-        }
-        .toggle-button button:hover {
-            transform: scale(1.05) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important;
-            background: linear-gradient(135deg, #1a1a1a, #002200) !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Container met class toggle-button zodat CSS automatisch wordt toegepast
-        st.markdown('<div class="toggle-button">', unsafe_allow_html=True)
-
-        col_empty_left, col_sets, col_ketchup, col_bear, col_sheriff, col_empty_right = st.columns([1,1,1,1,1,1])
-
-        # --- Set Codes Toggle ---
-        with col_sets:
-            btn_label = "📚" if not st.session_state["zoekset_active"] else "❌"
-            hover_text = "Zoek Set Codes" if not st.session_state["zoekset_active"] else "Sluit Set Codes"
-            if st.button(btn_label, key="sets_toggle_button", help=hover_text):
-                st.session_state["zoekset_active"] = not st.session_state["zoekset_active"]
-                st.rerun()
-
-        # --- Ketchup Toggle ---
-        with col_ketchup:
-            btn_label = "🍅" if not st.session_state["ketchup_active"] else "❌"
-            hover_text = "Ketch-Up" if not st.session_state["ketchup_active"] else "I like Mayo"
-            if st.button(btn_label, key="ketchup_toggle_button", help=hover_text):
-                st.session_state["ketchup_active"] = not st.session_state["ketchup_active"]
-                st.rerun()
-
-        # --- Bear Toggle ---
-        with col_bear:
-            btn_label = "🐻" if not st.session_state["bear_search_active"] else "❌"
-            hover_text = "Bear Hunt" if not st.session_state["bear_search_active"] else "No more Bears"
-            if st.button(btn_label, key="bear_toggle_button", help=hover_text):
-                st.session_state["bear_search_active"] = not st.session_state["bear_search_active"]
-                st.rerun()
-
-        # --- Sheriff Toggle ---
-        with col_sheriff:
-            btn_label = "🌟" if not st.session_state["sheriff_active"] else "❌"
-            hover_text = "Be the Sheriff" if not st.session_state["sheriff_active"] else "Shoot the Sheriff"
-            if st.button(btn_label, key="sheriff_toggle_button", help=hover_text):
-                st.session_state["sheriff_active"] = not st.session_state["sheriff_active"]
-                st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ------------------ Zoek Set actie met onafhankelijke zoekfunctie ------------------
-if st.session_state.get("zoekset_active", False):
-    spinner_ph = show_mana_spinner("Get your Sets Straight...")
-    sets_data = safe_api_call("https://api.scryfall.com/sets")
-    spinner_ph.empty()
-
-    if sets_data and "data" in sets_data:
-        all_sets = sets_data["data"]
-
-        # 1. Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
-        search_term = st.text_input("Zoek op Setnaam")
-
-        # 2. Filter sets op zoekterm, volledig onafhankelijk van categorieën
-        if search_term:
-            sets_list = [
-                s for s in all_sets
-                if not s.get("digital", False) and search_term.lower() in s.get("name", "").lower()
-            ]
-        else:
-            # Als er geen zoekterm is, filter op categorieën
-            set_type_options = {
-                "all": "All Sets",
-                "main": "Main Sets",
-                "commander": "Commander",
-                "special": "Specials"
-            }
-            selected_types = st.multiselect(
-                "Selecteer Set Categorie", list(set_type_options.values()), default=["Main Sets"]
-            )
-
-            sets_list = []
-            for s in all_sets:
-                if s.get("digital", False):
-                    continue  # alleen paper
-                set_type = s.get("set_type", "").lower()
-                if "All Sets" in selected_types:
-                    sets_list.append(s)
-                else:
-                    if "Main Sets" in selected_types and set_type in ["core", "expansion"]:
-                        sets_list.append(s)
-                    elif "Commander" in selected_types and set_type == "commander":
-                        sets_list.append(s)
-                    elif "Specials" in selected_types and set_type in ["masters","funny","promo","draft_innovation","planechase"]:
-                        sets_list.append(s)
-
-        # 3. Sorteren van nieuw naar oud
-        sets_list.sort(key=lambda s: s.get("released_at", "1900-01-01"), reverse=True)
-
-        st.subheader(f"Paper MTG Sets gevonden: {len(sets_list)}")
-
-        cols_per_row = 8
-        row_cols = []
-
-        # 4. CSS voor set container, logo, naam en hover
-        st.markdown("""
-        <style>
-        .set-container {
-            text-align: center;
-            margin-bottom: 16px;
-        }
-        .logo-green {
-            filter: invert(40%) sepia(100%) saturate(500%) hue-rotate(90deg);
-            transition: all 0.2s ease-in-out;
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            padding: 4px;
-            background-color: transparent;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            margin-bottom: 8px;
-        }
-        .set-name {
-            color: white;
-            font-size: 14px;
-            margin: 6px 0 2px 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .set-code {
-            color: gray;
-            font-size: 12px;
-            margin-bottom: 8px;
-            transition: all 0.2s ease-in-out;
-        }
-        .set-container:hover .logo-green {
-            filter: invert(40%) sepia(100%) saturate(700%) hue-rotate(90deg) brightness(1.2);
-            box-shadow: 0 0 10px 4px rgba(0,255,0,0.8);
-            transform: scale(1.15);
-        }
-        .set-container:hover .set-code {
-            color: #00ff00;
-            font-size: 12px;
-            text-shadow: 0 0 6px #00ff00;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # 5. Render sets per rij van 8
-        for i, s in enumerate(sets_list):
-            code = s.get("code", "").upper()
-            name = s.get("name", "Onbekend")
-            logo_url = s.get("icon_svg_uri", None)
-
-            if i % cols_per_row == 0:
-                row_cols = st.columns(cols_per_row)
-
-            col = row_cols[i % cols_per_row]
-            with col:
-                html = f"""
-                <div class="set-container">
-                    <img src="{logo_url}" class="logo-green" alt="{name}">
-                    <div class="set-name">{name}</div>
-                    <div class="set-code">[{code}]</div>
-                </div>
-                """
-                st.markdown(html, unsafe_allow_html=True)
-
-    else:
-        st.error("Geen sets gevonden.")
-
-    # ------------------ Ketchup actie ------------------
-    if st.session_state["ketchup_active"]:
-        spinner_ph = st.empty()
-        with spinner_ph.container():
-            st.info("🍅 Ketchup in actie... Even geduld!")
-            import time
-            time.sleep(1.5)  # Placeholder delay voor visueel effect
-        spinner_ph.empty()
-
-        st.subheader("Ketchup Items:")
-        example_items = ["Ketchup Card 1", "Ketchup Card 2", "Ketchup Card 3"]
-        for item in example_items:
-            st.markdown(f"- {item}")
-
-    # ------------------ Bear actie ------------------
-    if st.session_state["bear_search_active"]:
-        spinner_ph = show_mana_spinner("Bears Incoming...")
-        bear_cards = scryfall_search_all_limited("art:bear", max_cards=200)
-        spinner_ph.empty()
-        st.subheader(f"Bears Found: ({len(bear_cards)})")
-        render_cards_with_add(bear_cards)
-
-    # ------------------ Sheriff actie ------------------
-    if st.session_state["sheriff_active"]:
-        try:
-            sheriff_img = Image.open("Sherrif - Commander.png")
-            st.image(sheriff_img, use_container_width=False, output_format="PNG", clamp=False, width=None, caption=None)
-            st.markdown("<style>img[alt=''] {max-height:90vh; height:auto; width:auto;}</style>", unsafe_allow_html=True)
-        except:
-            st.error("Afbeelding 'Sherrif - Commander.png' niet gevonden.")
-
-bear_and_sheriff_toggle(st.session_state.get('selected_deck_name'))
-
-# ------------------ Footer ------------------
+# ------------------ Footer Toggles & Tabs ------------------
 def footer():
     year = datetime.datetime.now().year
-    
-    footer_html = f"""
+    st.markdown(f"""
+    <style>
+    .footer {{
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background: linear-gradient(135deg, #0d141c, #001900);
+        color: white;
+        text-align: center;
+        padding: 8px 0;
+        font-size: 14px;
+        z-index: 9999;
+    }}
+    </style>
     <div class="footer">
-        <div>CommanderDeckDoctor</div>
-        <div>© SdB {year}</div>
+        CommanderDeckDoctor © SdB {year}
     </div>
-    """
-    st.markdown(footer_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 footer()
-
- 
 
