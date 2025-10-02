@@ -194,71 +194,77 @@ from supabase import create_client, Client
 import hashlib, json, os
 from PIL import Image
 
-# ------------------ Supabase setup ------------------
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+# ------------------ User-specific Deck Helpers (Supabase + fallback) ------------------
+from supabase import create_client, Client
+import streamlit as st
+import hashlib, json, os
+
+# --- Supabase client instellen ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]  # zorg dat dit in je secrets.toml staat
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]  # anon of service_role met RLS permissies
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ------------------ User-specific Deck Helpers ------------------
+# --- Lokaal pad fallback ---
+LOCAL_DATA_DIR = "data"
+os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
+
 def get_user_deck_key():
-    """Retourneer de gebruikersnaam, fallback 'guest'"""
+    """Genereer een unieke key gebaseerd op de gebruikersnaam (default: guest)."""
     user_name = st.session_state.get("user_name", "").strip()
     if not user_name:
-        user_name = "guest"
+        user_name = "Guest"
     return user_name
 
-def load_user_decks():
-    """Laad decks voor gebruiker: Supabase eerst, fallback JSON"""
+def save_user_decks():
+    """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
     user_name = get_user_deck_key()
-    
-    # Probeer Supabase
+    decks = st.session_state.get("added_decks", [])
+
     try:
-        response = supabase.table("user_decks").select("deck_data").eq("user_name", user_name).single().execute()
-        if response.data and response.data.get("deck_data"):
+        existing = supabase.table("user_decks").select("*").eq("user_name", user_name).maybe_single().execute()
+        if existing and hasattr(existing, "data") and existing.data:
+            res = supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_name).execute()
+        else:
+            res = supabase.table("user_decks").insert({"user_name": user_name, "deck_data": decks}).execute()
+
+        if res and hasattr(res, "error") and res.error:
+            raise Exception(res.error)
+    except Exception as e:
+        st.warning(f"Supabase niet bereikbaar, fallback naar lokaal JSON: {e}")
+        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(decks, f, ensure_ascii=False, indent=2)
+
+def load_user_decks():
+    """Haal decks op uit Supabase. Fallback naar lokaal JSON als Supabase faalt of geen rijen."""
+    user_name = get_user_deck_key()
+
+    try:
+        response = supabase.table("user_decks").select("deck_data").eq("user_name", user_name).maybe_single().execute()
+        # Check of response geldig is
+        if response and hasattr(response, "data") and response.data and "deck_data" in response.data:
             st.session_state["added_decks"] = response.data["deck_data"]
             return response.data["deck_data"]
+        else:
+            # Geen Supabase data, check lokaal
+            json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
+            if os.path.exists(json_file):
+                with open(json_file, "r", encoding="utf-8") as f:
+                    decks = json.load(f)
+                    st.session_state["added_decks"] = decks
+                    return decks
+            st.session_state["added_decks"] = []
+            return []
     except Exception as e:
-        st.warning(f"Supabase niet bereikbaar, fallback naar lokaal JSON. ({e})")
-    
-    # fallback lokaal JSON
-    os.makedirs("data", exist_ok=True)
-    json_file = os.path.join("data", f"added_decks_{user_name}.json")
-    if os.path.exists(json_file):
-        try:
+        st.warning(f"Supabase niet bereikbaar, fallback naar lokaal JSON: {e}")
+        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
+        if os.path.exists(json_file):
             with open(json_file, "r", encoding="utf-8") as f:
                 decks = json.load(f)
                 st.session_state["added_decks"] = decks
                 return decks
-        except Exception:
-            pass
-
-    st.session_state["added_decks"] = []
-    return []
-
-def save_user_decks():
-    """Sla decks op voor gebruiker: Supabase eerst, fallback JSON"""
-    user_name = get_user_deck_key()
-    decks = st.session_state.get("added_decks", [])
-
-    # Probeer Supabase
-    try:
-        existing = supabase.table("user_decks").select("*").eq("user_name", user_name).single().execute()
-        if existing.data:
-            supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_name).execute()
-        else:
-            supabase.table("user_decks").insert({"user_name": user_name, "deck_data": decks}).execute()
-        return
-    except Exception as e:
-        st.warning(f"Opslaan in Supabase mislukt, fallback naar lokaal JSON. ({e})")
-
-    # fallback lokaal JSON
-    os.makedirs("data", exist_ok=True)
-    json_file = os.path.join("data", f"added_decks_{user_name}.json")
-    try:
-        with open(json_file, "w", encoding="utf-8") as f:
-            json.dump(decks, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        st.error(f"Fout bij lokaal opslaan van decks: {e}")
+        st.session_state["added_decks"] = []
+        return []
 
 
 # ------------------ Landingpagina & Tab Logic ------------------
