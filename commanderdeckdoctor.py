@@ -903,7 +903,7 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
     )
 # ------------------ VERREKES HENDIG Expander ------------------
 def sidebar_toggle_expander():
-    """Verekkes Hendig toggles in sidebar, maximaal één actief tegelijk, hover en active state"""
+    """Verekkes Hendig toggles in sidebar, maximaal één actief tegelijk, hovertekst en active state"""
 
     # Session state defaults
     st.session_state.setdefault("bear_search_active", False)
@@ -911,10 +911,10 @@ def sidebar_toggle_expander():
     st.session_state.setdefault("ketchup_active", False)
     st.session_state.setdefault("zoekset_active", False)
 
-    # CSS styling voor buttons
+    # CSS styling enkel voor deze toggle-buttons
     st.markdown("""
     <style>
-    .stButton > button { 
+    .toggle-button-wrapper .stButton > button { 
         width: 60px !important; 
         height: 60px !important; 
         border-radius: 12px !important; 
@@ -923,27 +923,28 @@ def sidebar_toggle_expander():
         cursor: pointer !important; 
         border: none !important; 
         margin: 4px; 
-        background: linear-gradient(to right, #111127, #011901) !important; /* expander-kleur */
+        background: linear-gradient(to right, #111127, #011901) !important;
         color: white !important; 
         box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
         position: relative;
         transition: all 0.2s ease-in-out;
     }
-    .stButton > button:hover {
+    .toggle-button-wrapper .stButton > button:hover {
         transform: scale(1.1);
         box-shadow: 0 0 12px rgba(0,255,0,0.5), 0 4px 6px rgba(0,0,0,0.5);
         background: linear-gradient(to right, #1a1a1a, #002200) !important;
     }
-    .stButton > button.active {
+    .toggle-button-wrapper .stButton > button.active {
         background: linear-gradient(135deg, #3b7c3b, #5a995a, #4a884a) !important;
         box-shadow: 0 0 15px rgba(0,255,0,0.8), 0 4px 8px rgba(0,0,0,0.5) !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Expander
+    # Expander met wrapper
     with st.sidebar.expander("Verekkes Hendig", expanded=False):
         st.caption("Activeer helpende tools door ze aan/uit te zetten")
+        st.markdown('<div class="toggle-button-wrapper">', unsafe_allow_html=True)
 
         col_set, col_ketchup, col_bear, col_sheriff = st.columns(4)
 
@@ -955,7 +956,6 @@ def sidebar_toggle_expander():
                 st.session_state["bear_search_active"] = False
                 st.session_state["ketchup_active"] = False
                 st.session_state["sheriff_active"] = False
-            # Active class via JS
             st.markdown(f"""
             <script>
             const btn = window.parent.document.querySelector('[data-key="sets_toggle_button"] button');
@@ -1007,6 +1007,9 @@ def sidebar_toggle_expander():
             if(btn) {{ btn.className = '{classes}'; }}
             </script>
             """, unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ------------------ Active Toggle Render ------------------
 def render_active_toggle_results():
