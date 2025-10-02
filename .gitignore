@@ -35,5 +35,6 @@ cdd_cache/
 deckdoctor_cache/
 
 # ---- Project specific ----
-# Deck bestand lokaal houden
-data/added_decks.json
+# User-specific decks
+/data/added_decks_*.json
+/data/decks.json  # optioneel, als er een centrale file is

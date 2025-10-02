@@ -188,41 +188,26 @@ for key, default in {
 active_tab = st.query_params.get("tab", [""])[0]
 if active_tab:
     st.session_state.app_started = True
-
-# ------------------ User-specific Deck Helpers (Supabase) ------------------
-from supabase import create_client, Client
-import streamlit as st
-import hashlib, json, os
-
-# Haal Supabase URL & Key op uit Streamlit secrets
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+# ------------------ User-specific Deck Helpers ------------------
 def get_user_deck_key():
-    """Genereer een vaste user_name of fallback guest"""
+    """Genereer een unieke sleutel per gebruiker op basis van naam of sessie-ID"""
     user_name = st.session_state.get("user_name", "").strip().lower()
     if not user_name:
-        user_name = "guest"
-    return user_name
+        if "session_id" not in st.session_state:
+            st.session_state["session_id"] = str(uuid.uuid4())
+        user_name = st.session_state["session_id"]
+    return f"added_decks_{hashlib.md5(user_name.encode()).hexdigest()}"
 
 def load_user_decks():
-    """Haal decks op uit Supabase voor deze gebruiker, fallback naar JSON lokaal"""
-    user_name = get_user_deck_key()
-
-    # Probeer eerst Supabase
-    try:
-        response = supabase.table("user_decks").select("deck_data").eq("user_name", user_name).single().execute()
-        if response.data and response.data.get("deck_data") is not None:
-            st.session_state["added_decks"] = response.data["deck_data"]
-            return response.data["deck_data"]
-    except Exception:
-        pass  # Als Supabase faalt, fallback naar lokaal
-
-    # Fallback: lokale JSON
     key = get_user_deck_key()
+    decks = cache.get(key)
+    if decks is not None:
+        st.session_state["added_decks"] = decks
+        return decks
+
     os.makedirs("data", exist_ok=True)
     json_file = os.path.join("data", f"{key}.json")
+
     if os.path.exists(json_file):
         try:
             with open(json_file, "r", encoding="utf-8") as f:
@@ -236,24 +221,12 @@ def load_user_decks():
     return []
 
 def save_user_decks():
-    """Sla decks op in Supabase voor deze gebruiker, fallback naar JSON lokaal"""
-    user_name = get_user_deck_key()
+    key = get_user_deck_key()
     decks = st.session_state.get("added_decks", [])
-
-    # Probeer Supabase
-    try:
-        existing = supabase.table("user_decks").select("*").eq("user_name", user_name).single().execute()
-        if existing.data:
-            supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_name).execute()
-        else:
-            supabase.table("user_decks").insert({"user_name": user_name, "deck_data": decks}).execute()
-        return
-    except Exception:
-        pass  # Fallback naar lokaal opslaan
-
-    # Fallback: lokale JSON
+    cache.set(key, decks)
     os.makedirs("data", exist_ok=True)
-    json_file = os.path.join("data", f"{user_name}.json")
+
+    json_file = os.path.join("data", f"{key}.json")
     try:
         with open(json_file, "w", encoding="utf-8") as f:
             json.dump(decks, f, ensure_ascii=False, indent=2)
@@ -544,23 +517,10 @@ def add_to_deck_box(card):
     """Voeg kaart toe aan Deck-Box en sla persistente opslag op"""
     if card["name"] not in [c["name"] for c in st.session_state["deck_box"]]:
         st.session_state["deck_box"].append(card)
-
-        # Sla lokaal op in cache
         user_deck_key = get_user_deck_key()
         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
-
-        # Probeer ook op te slaan in Supabase
-        try:
-            decks = st.session_state["deck_box"]
-            existing = supabase.table("user_decks").select("*").eq("user_name", user_deck_key).single().execute()
-            if existing.data:
-                supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_deck_key).execute()
-            else:
-                supabase.table("user_decks").insert({"user_name": user_deck_key, "deck_data": decks}).execute()
-        except Exception:
-            pass  # Als Supabase faalt, fallback naar lokaal (cache)
-
         st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
+
 
 def remove_from_deck_box(card):
     """Verwijder kaart uit Deck-Box en update persistente opslag"""

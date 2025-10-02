@@ -1,11 +1,6 @@
-sep fixes:
+okt fixes:
 - Ketch-Up opnieuw maken en toevoegen
-- IPad OS 15 geeft code en geen weergaves
-- ui verfijnen
-- adaptieve breedte kaartweergaves fixen.
-- weergave opties door user:
-	- kleur
-- hoover strak om kaart heen in plaats van opvullen van de rij
+
 
 
 Latere functies toevoegen:
@@ -25,11 +20,28 @@ UX	User Experience	Hoe de gebruiker het ervaart
 
 
 
-Mijn volledige appcode: 
-[plak hier je code]
+Repo update vis Powershell in map:
 
-Voer alleen deze wijziging uit:
-[beschrijf exact wat je wilt toevoegen of veranderen]
+git add .
+git commit -m "mijn update"
+git push
 
-Gebruik de bestaande code als basis. Verander niets anders.  
-Geef me de **hele aangepaste code** terug, volledig werkend in Streamlit.
+
+My Decks:
+5771540  Pantlaza
+5258986  Talion
+5617293  Baeloth
+3784234  Atraxa
+14473934 Inspirit
+9935783  Wolverine
+9201725	 Lord of Pain
+4291381  Shalai
+7539511  Ayula
+6326448  Fynn
+
+
+Fuck up(date)s van vandaag:
+
+
+PFTB8UrC.5XiAR# > Supabase WW
+
