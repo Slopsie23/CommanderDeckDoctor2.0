@@ -249,10 +249,13 @@ def save_user_decks():
     # --- Supabase opslaan ---
     if supabase:
         try:
-            existing = supabase.table("user_decks").select("*").eq("user_name", user_key).single().execute()
-            if existing.data:
+            # check of er al een record is
+            response = supabase.table("user_decks").select("*").eq("user_name", user_key).execute()
+            if response.data and len(response.data) > 0:
+                # update bestaand record
                 supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_key).execute()
             else:
+                # insert nieuw record
                 supabase.table("user_decks").insert({"user_name": user_key, "deck_data": decks}).execute()
             return
         except Exception as e:
@@ -627,8 +630,8 @@ WUBRG_ORDER = "WUBRG"
 def order_colors_wubrg(colors_set):
     order = {c: i for i, c in enumerate(WUBRG_ORDER)}
     return "".join(sorted(list(colors_set), key=lambda c: order.get(c, 99)))
-    
-# ------------------ Render Cards helpers -----------------
+
+# ------------------ Render Cards helpers ------------------    
 def render_cards_with_add(cards, columns=None):
     """Render kaarten in een grid met hover-effect en gecentreerde Add-to-Deck knop.
        Toegevoegde kaarten worden per gebruiker persistent opgeslagen."""
@@ -637,13 +640,12 @@ def render_cards_with_add(cards, columns=None):
         st.info("Geen kaarten om weer te geven.")
         return
 
-    # Kolommen bepalen
     if columns is None:
         columns = st.session_state.get("cards_per_row", 6)
 
     for i in range(0, len(cards), columns):
         row_cards = cards[i:i+columns]
-        cols = st.columns(columns)  # altijd gekozen aantal kolommen
+        cols = st.columns(columns)
 
         for col_idx, card in enumerate(row_cards):
             with cols[col_idx]:
@@ -652,7 +654,6 @@ def render_cards_with_add(cards, columns=None):
                           "https://via.placeholder.com/223x310?text=Geen+afbeelding"
                 name = card.get("name", "Onbekend")
 
-                # Kaart afbeelding + naam
                 st.markdown(f"""
                 <div class="card-hover-container">
                     <img src="{img_url}" title="{name}" />
@@ -660,11 +661,10 @@ def render_cards_with_add(cards, columns=None):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Unieke key per kaart
-                button_key = f"add_card_{card.get('id', name)}"
+                # Maak een **unieke key** op basis van index + id/name
+                button_key = f"add_card_{i}_{col_idx}_{card.get('id', name)}"
 
                 if st.button("✚", key=button_key, help="Voeg toe aan Deck-Box"):
-                    # per-gebruiker Deck-Box laden
                     if "deck_box" not in st.session_state:
                         st.session_state["deck_box"] = []
 
@@ -673,12 +673,12 @@ def render_cards_with_add(cards, columns=None):
                         st.session_state["deck_box"].append(card)
 
                         # persistente opslag per gebruiker in cache
-                        user_deck_key = get_user_deck_key()  # hergebruik helper uit eerdere stap
+                        user_deck_key = get_user_deck_key()
                         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
 
                         st.toast(f"{name} toegevoegd aan Deck-Box ✅")
 
-
+# ------------------ Keyword helpers ------------------
 def get_all_keywords():
     keywords = [
         "+1/+1 Counter", "Copy", "Haste", "Flying", "Trample", "Lifelink", "Menace",
