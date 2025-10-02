@@ -372,21 +372,71 @@ st.markdown("""
     transform: scale(1.3);
     text-shadow: 0 0 8px rgba(220,50,50,0.8);
 }
+</style>
+""", unsafe_allow_html=True)   
 
 # ------------------ Mana Spinner helper ------------------
-@keyframes mana-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes mana-counter { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-.mana-spinner-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; margin: 12px 0 18px; }
-.mana-spinner { position: relative; width: 120px; height: 120px; border-radius: 50%; animation: mana-spin 3s linear infinite; }
-.mana { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; margin: -18px 0 0 -18px; transform: rotate(calc(var(--i) * 72deg)) translate(50px); transform-origin: center center; }
-.mana .face { width: 100%; height: 100%; transform: rotate(calc(-1 * var(--i) * 72deg)); animation: mana-counter 3s linear infinite; transition: animation-play-state 0.2s ease; }
-.mana-spinner:hover .face { animation-play-state: paused; }
-.mana img { width: 100%; height: 100%; display:block; }
-.mana-msg { margin-top: 6px; font-size: 14px; opacity: 0.9; text-align:center; }
+st.markdown("""
+<style>
+@keyframes mana-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); } /* container draait rechtsom */
+}
+
+@keyframes face-counter-spin {
+    from { transform: rotate(calc(-1 * var(--i) * 72deg)); }
+    to { transform: rotate(calc(-1 * var(--i) * 72deg - 360deg)); } /* symbolen draaien tegen de klok in vanaf de juiste hoek */
+}
+
+.mana-spinner-wrap {
+    display:flex; 
+    flex-direction:column; 
+    align-items:center; 
+    justify-content:center; 
+    margin: 12px 0 18px; 
+}
+
+.mana-spinner {
+    position: relative; 
+    width: 120px; 
+    height: 120px; 
+    border-radius: 50%; 
+    animation: mana-spin 6s linear infinite; /* duur cirkelrotatie */
+}
+
+.mana {
+    position: absolute; 
+    top: 50%; 
+    left: 50%; 
+    width: 36px; 
+    height: 36px; 
+    margin: -18px 0 0 -18px; 
+    transform: rotate(calc(var(--i) * 72deg)) translate(50px);
+    transform-origin: center center;
+}
+
+.mana .face {
+    width: 100%; 
+    height: 100%; 
+    transform-origin: center center;
+    animation: face-counter-spin 6s linear infinite; /* symbolen draaien tegen de klok in vanaf juiste hoek */
+}
+
+.mana img {
+    width: 100%; 
+    height: 100%; 
+    display:block;
+}
+
+.mana-msg {
+    margin-top: 6px; 
+    font-size: 14px; 
+    opacity: 0.9; 
+    text-align:center;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ Custom spinner helper ------------------
 def show_mana_spinner(message="Bezig met laden..."):
     ph = st.empty()
     html = f"""
@@ -852,95 +902,111 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
          "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
     )
 # ------------------ VERREKES HENDIG Expander ------------------
-st.markdown("""
-<style>
-/* Sidebar toggle-buttons */
-.toggle-button button { 
-    width: 60px !important; 
-    height: 60px !important; 
-    border-radius: 12px !important; 
-    font-size: 24px !important; 
-    font-weight: bold !important; 
-    cursor: pointer !important; 
-    border: none !important; 
-    transition: all 0.25s ease-in-out; 
-    text-align: center; 
-    margin: 4px; 
-    background: linear-gradient(135deg, #150f30, #001900) !important; 
-    color: white !important; 
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
-}
-
-.toggle-button button:hover {
-    transform: scale(1.15) rotate(0deg) !important;
-    box-shadow: 0 0 12px rgba(0,255,0,0.8), 0 4px 8px rgba(0,0,0,0.7) !important;
-    background: linear-gradient(135deg, #1a1a1a, #002200) !important;
-}
-
-.toggle-button button:active {
-    transform: scale(1.1) !important;
-    box-shadow: 0 0 8px rgba(0,255,0,0.5), 0 2px 6px rgba(0,0,0,0.5) !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 def sidebar_toggle_expander():
-    """Plaats Bear / Set / Ketchup / Sheriff toggles in een sidebar-expander"""
+    """Verekkes Hendig toggles in sidebar, maximaal één actief tegelijk, hover en active state"""
+
+    # Session state defaults
     st.session_state.setdefault("bear_search_active", False)
     st.session_state.setdefault("sheriff_active", False)
     st.session_state.setdefault("ketchup_active", False)
     st.session_state.setdefault("zoekset_active", False)
 
-    with st.sidebar.expander("Verekkes Hendig", expanded=False):
-        col_sets, col_ketchup, col_bear, col_sheriff = st.columns(4)
+    # CSS styling voor buttons
+    st.markdown("""
+    <style>
+    .stButton > button { 
+        width: 60px !important; 
+        height: 60px !important; 
+        border-radius: 12px !important; 
+        font-size: 24px !important; 
+        font-weight: bold !important; 
+        cursor: pointer !important; 
+        border: none !important; 
+        margin: 4px; 
+        background: linear-gradient(to right, #111127, #011901) !important; /* expander-kleur */
+        color: white !important; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+        position: relative;
+        transition: all 0.2s ease-in-out;
+    }
+    .stButton > button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 0 12px rgba(0,255,0,0.5), 0 4px 6px rgba(0,0,0,0.5);
+        background: linear-gradient(to right, #1a1a1a, #002200) !important;
+    }
+    .stButton > button.active {
+        background: linear-gradient(135deg, #3b7c3b, #5a995a, #4a884a) !important;
+        box-shadow: 0 0 15px rgba(0,255,0,0.8), 0 4px 8px rgba(0,0,0,0.5) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-        # --- Set Codes Toggle ---
-        with col_sets:
-            btn_label = "📚" if not st.session_state["zoekset_active"] else "❌"
-            hover_text = "Zoek Set Codes" if not st.session_state["zoekset_active"] else "Sluit Set Codes"
-            if st.button(btn_label, key="sets_toggle_button", help=hover_text):
-                st.session_state.update({
-                    "zoekset_active": not st.session_state["zoekset_active"],
-                    "ketchup_active": False,
-                    "bear_search_active": False,
-                    "sheriff_active": False
-                })
+    # Expander
+    with st.sidebar.expander("Verekkes Hendig", expanded=False):
+        st.caption("Activeer helpende tools door ze aan/uit te zetten")
+
+        col_set, col_ketchup, col_bear, col_sheriff = st.columns(4)
+
+        # --- Set Toggle ---
+        with col_set:
+            classes = "active" if st.session_state["zoekset_active"] else ""
+            if st.button("📚", key="sets_toggle_button", help="Set Search: Zoek Set-Codes"):
+                st.session_state["zoekset_active"] = not st.session_state["zoekset_active"]
+                st.session_state["bear_search_active"] = False
+                st.session_state["ketchup_active"] = False
+                st.session_state["sheriff_active"] = False
+            # Active class via JS
+            st.markdown(f"""
+            <script>
+            const btn = window.parent.document.querySelector('[data-key="sets_toggle_button"] button');
+            if(btn) {{ btn.className = '{classes}'; }}
+            </script>
+            """, unsafe_allow_html=True)
 
         # --- Ketchup Toggle ---
         with col_ketchup:
-            btn_label = "🍅" if not st.session_state["ketchup_active"] else "❌"
-            hover_text = "Ketch-Up" if not st.session_state["ketchup_active"] else "Sluit Ketch-Up"
-            if st.button(btn_label, key="ketchup_toggle_button", help=hover_text):
-                st.session_state.update({
-                    "ketchup_active": not st.session_state["ketchup_active"],
-                    "zoekset_active": False,
-                    "bear_search_active": False,
-                    "sheriff_active": False
-                })
+            classes = "active" if st.session_state["ketchup_active"] else ""
+            if st.button("🍅", key="ketchup_toggle_button", help="Ketch-Up: wat heb je gemist?"):
+                st.session_state["ketchup_active"] = not st.session_state["ketchup_active"]
+                st.session_state["bear_search_active"] = False
+                st.session_state["zoekset_active"] = False
+                st.session_state["sheriff_active"] = False
+            st.markdown(f"""
+            <script>
+            const btn = window.parent.document.querySelector('[data-key="ketchup_toggle_button"] button');
+            if(btn) {{ btn.className = '{classes}'; }}
+            </script>
+            """, unsafe_allow_html=True)
 
         # --- Bear Toggle ---
         with col_bear:
-            btn_label = "🐻" if not st.session_state["bear_search_active"] else "❌"
-            hover_text = "Bear Hunt" if not st.session_state["bear_search_active"] else "No more Bears"
-            if st.button(btn_label, key="bear_toggle_button", help=hover_text):
-                st.session_state.update({
-                    "bear_search_active": not st.session_state["bear_search_active"],
-                    "zoekset_active": False,
-                    "ketchup_active": False,
-                    "sheriff_active": False
-                })
+            classes = "active" if st.session_state["bear_search_active"] else ""
+            if st.button("🐻", key="bear_toggle_button", help="Bear Search: alle kaarten met beren in de art"):
+                st.session_state["bear_search_active"] = not st.session_state["bear_search_active"]
+                st.session_state["zoekset_active"] = False
+                st.session_state["ketchup_active"] = False
+                st.session_state["sheriff_active"] = False
+            st.markdown(f"""
+            <script>
+            const btn = window.parent.document.querySelector('[data-key="bear_toggle_button"] button');
+            if(btn) {{ btn.className = '{classes}'; }}
+            </script>
+            """, unsafe_allow_html=True)
 
         # --- Sheriff Toggle ---
         with col_sheriff:
-            btn_label = "🌟" if not st.session_state["sheriff_active"] else "❌"
-            hover_text = "Be the Sheriff" if not st.session_state["sheriff_active"] else "Sluit Sheriff"
-            if st.button(btn_label, key="sheriff_toggle_button", help=hover_text):
-                st.session_state.update({
-                    "sheriff_active": not st.session_state["sheriff_active"],
-                    "zoekset_active": False,
-                    "ketchup_active": False,
-                    "bear_search_active": False
-                })
+            classes = "active" if st.session_state["sheriff_active"] else ""
+            if st.button("🌟", key="sheriff_toggle_button", help="Sheriff: rules and play"):
+                st.session_state["sheriff_active"] = not st.session_state["sheriff_active"]
+                st.session_state["zoekset_active"] = False
+                st.session_state["ketchup_active"] = False
+                st.session_state["bear_search_active"] = False
+            st.markdown(f"""
+            <script>
+            const btn = window.parent.document.querySelector('[data-key="sheriff_toggle_button"] button');
+            if(btn) {{ btn.className = '{classes}'; }}
+            </script>
+            """, unsafe_allow_html=True)
 
 # ------------------ Active Toggle Render ------------------
 def render_active_toggle_results():
