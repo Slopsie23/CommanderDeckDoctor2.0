@@ -66,28 +66,31 @@ div.stButton > button:hover {
     background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
 }
 /* ---------------- Toggle-buttons Bear/Ketchup/Set/Sheriff ---------------- */
-.toggle-button button { 
+.toggle-button-wrapper .stButton > button { 
     width: 60px !important; 
     height: 60px !important; 
     border-radius: 12px !important; 
-    font-size: 24px !important; 
+    font-size: 40px !important; 
     font-weight: bold !important; 
     cursor: pointer !important; 
     border: none !important; 
-    transition: all 0.2s ease-in-out; 
-    text-align: center; 
     margin: 4px; 
-
-    /* Expander header look */
-    background: linear-gradient(135deg, #150f30, #001900) !important; 
+    background: linear-gradient(to right,#111127,#011901) !important;
     color: white !important; 
     box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+    transition: all 0.2s ease-in-out;
 }
-
-.toggle-button button:hover {
-    transform: scale(1.05) !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.7) !important;
-    background: linear-gradient(135deg, #1a1a1a, #002200) !important;
+.toggle-button-wrapper .stButton > button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(0,255,0,0.5),0 4px 6px rgba(0,0,0,0.5);
+    background: linear-gradient(to right,#1a1a1a,#002200) !important;
+}
+/* Actief */
+.toggle-button-wrapper .stButton > button.active {
+    background: linear-gradient(135deg,#3b7c3b,#5a995a,#4a884a) !important;
+    border: 2px solid #00ff00 !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(0,255,0,0.8),0 4px 8px rgba(0,0,0,0.5) !important;
 }
 
 /* ---------------- Expander headers ---------------- */
@@ -516,7 +519,7 @@ def add_to_deck_box(card):
         st.session_state["deck_box"].append(card)
         user_deck_key = get_user_deck_key()
         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
-        st.toast(f"{card['name']} toegevoegd aan Deck-Box ✅")
+        st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
 
 
 def remove_from_deck_box(card):
@@ -852,7 +855,7 @@ if user_changed_input and not start_btn:
     start_btn = True
 
 
-# ------------------ Export expander ------------------
+# ------------------ DECK-BOX Expander ------------------
 with st.sidebar.expander("Deck-Box", expanded=False):
     st.caption("Toegevoegde kaarten, klaar voor export")
 
@@ -885,7 +888,7 @@ with st.sidebar.expander("Deck-Box", expanded=False):
     else:
         st.info("Je Deck-Box is nog leeg.")
 
-# ------------------ Weergave Instellingen ------------------
+# ------------------ WEERGAVE Expander------------------
 with st.sidebar.expander("Weergave instellingen", expanded=False):
     st.session_state["cards_per_row"] = st.slider(
         "Kaarten per rij",
@@ -901,112 +904,74 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
         ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
          "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
     )
-# ------------------ VERREKES HENDIG Expander ------------------
+# ------------------ GOOD STUFF Expander ------------------
 def sidebar_toggle_expander():
-    """Verekkes Hendig toggles in sidebar, maximaal één actief tegelijk, hovertekst en active state"""
+    """Good Stuff toggles in sidebar met oog-indicatie (fade-in & glow één keer)"""
 
     # Session state defaults
-    st.session_state.setdefault("bear_search_active", False)
-    st.session_state.setdefault("sheriff_active", False)
-    st.session_state.setdefault("ketchup_active", False)
-    st.session_state.setdefault("zoekset_active", False)
+    for key in ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]:
+        st.session_state.setdefault(key, False)
 
-    # CSS styling enkel voor deze toggle-buttons
     st.markdown("""
     <style>
     .toggle-button-wrapper .stButton > button { 
-        width: 60px !important; 
-        height: 60px !important; 
-        border-radius: 12px !important; 
-        font-size: 24px !important; 
-        font-weight: bold !important; 
-        cursor: pointer !important; 
-        border: none !important; 
-        margin: 4px; 
-        background: linear-gradient(to right, #111127, #011901) !important;
-        color: white !important; 
-        box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
-        position: relative;
-        transition: all 0.2s ease-in-out;
+        width: 60px !important; height: 60px !important; border-radius: 12px !important;
+        font-size: 40px !important; font-weight: bold !important; cursor: pointer !important;
+        border: none !important; margin: 4px; background: linear-gradient(to right, #111127, #011901) !important;
+        color: white !important; box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+        position: relative; transition: all 0.2s ease-in-out;
     }
     .toggle-button-wrapper .stButton > button:hover {
         transform: scale(1.1);
         box-shadow: 0 0 12px rgba(0,255,0,0.5), 0 4px 6px rgba(0,0,0,0.5);
         background: linear-gradient(to right, #1a1a1a, #002200) !important;
     }
-    .toggle-button-wrapper .stButton > button.active {
-        background: linear-gradient(135deg, #3b7c3b, #5a995a, #4a884a) !important;
-        box-shadow: 0 0 15px rgba(0,255,0,0.8), 0 4px 8px rgba(0,0,0,0.5) !important;
+    .eye-glow {
+        font-size: 22px;
+        color: #00ff00;
+        text-align: center;
+        opacity: 0;
+        animation: eyeFadeGlow 1s ease-in-out forwards; /* één keer uitvoeren en blijven staan */
+    }
+    @keyframes eyeFadeGlow {
+        0% { opacity: 0; text-shadow: 0 0 2px #00ff00; }
+        50% { opacity: 1; text-shadow: 0 0 12px #00ff00, 0 0 20px #00ff00; }
+        100% { opacity: 1; text-shadow: 0 0 8px #00ff00, 0 0 16px #00ff00; }
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Expander met wrapper
-    with st.sidebar.expander("Verekkes Hendig", expanded=False):
-        st.caption("Activeer helpende tools door ze aan/uit te zetten")
+    with st.sidebar.expander("Good Stuff", expanded=False):
+        st.caption("Activeer tools door ze aan/uit te zetten")
         st.markdown('<div class="toggle-button-wrapper">', unsafe_allow_html=True)
 
-        col_set, col_ketchup, col_bear, col_sheriff = st.columns(4)
+        # Toggle kolommen
+        cols = st.columns(5)
+        toggle_keys = ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]
+        toggle_icons = ["🛡️", "🍅", "🐻", "⭐", "🎵"]
+        toggle_help = [
+            "Set Search: Zoek Set-Codes",
+            "Ketch-Up: wat heb je gemist?",
+            "Bear Search: beren in de art",
+            "Sheriff: rules and play",
+            "Sound of Magic: MOB playlist"
+        ]
 
-        # --- Set Toggle ---
-        with col_set:
-            classes = "active" if st.session_state["zoekset_active"] else ""
-            if st.button("📚", key="sets_toggle_button", help="Set Search: Zoek Set-Codes"):
-                st.session_state["zoekset_active"] = not st.session_state["zoekset_active"]
-                st.session_state["bear_search_active"] = False
-                st.session_state["ketchup_active"] = False
-                st.session_state["sheriff_active"] = False
-            st.markdown(f"""
-            <script>
-            const btn = window.parent.document.querySelector('[data-key="sets_toggle_button"] button');
-            if(btn) {{ btn.className = '{classes}'; }}
-            </script>
-            """, unsafe_allow_html=True)
+        # --- Render toggles ---
+        for i, (col, key, icon, help_text) in enumerate(zip(cols, toggle_keys, toggle_icons, toggle_help)):
+            button_key = f"{key}_btn"
+            clicked = col.button(icon, key=button_key, help=help_text)
+            if clicked:
+                st.session_state[key] = not st.session_state[key]  # toggle aan/uit
 
-        # --- Ketchup Toggle ---
-        with col_ketchup:
-            classes = "active" if st.session_state["ketchup_active"] else ""
-            if st.button("🍅", key="ketchup_toggle_button", help="Ketch-Up: wat heb je gemist?"):
-                st.session_state["ketchup_active"] = not st.session_state["ketchup_active"]
-                st.session_state["bear_search_active"] = False
-                st.session_state["zoekset_active"] = False
-                st.session_state["sheriff_active"] = False
-            st.markdown(f"""
-            <script>
-            const btn = window.parent.document.querySelector('[data-key="ketchup_toggle_button"] button');
-            if(btn) {{ btn.className = '{classes}'; }}
-            </script>
-            """, unsafe_allow_html=True)
-
-        # --- Bear Toggle ---
-        with col_bear:
-            classes = "active" if st.session_state["bear_search_active"] else ""
-            if st.button("🐻", key="bear_toggle_button", help="Bear Search: alle kaarten met beren in de art"):
-                st.session_state["bear_search_active"] = not st.session_state["bear_search_active"]
-                st.session_state["zoekset_active"] = False
-                st.session_state["ketchup_active"] = False
-                st.session_state["sheriff_active"] = False
-            st.markdown(f"""
-            <script>
-            const btn = window.parent.document.querySelector('[data-key="bear_toggle_button"] button');
-            if(btn) {{ btn.className = '{classes}'; }}
-            </script>
-            """, unsafe_allow_html=True)
-
-        # --- Sheriff Toggle ---
-        with col_sheriff:
-            classes = "active" if st.session_state["sheriff_active"] else ""
-            if st.button("🌟", key="sheriff_toggle_button", help="Sheriff: rules and play"):
-                st.session_state["sheriff_active"] = not st.session_state["sheriff_active"]
-                st.session_state["zoekset_active"] = False
-                st.session_state["ketchup_active"] = False
-                st.session_state["bear_search_active"] = False
-            st.markdown(f"""
-            <script>
-            const btn = window.parent.document.querySelector('[data-key="sheriff_toggle_button"] button');
-            if(btn) {{ btn.className = '{classes}'; }}
-            </script>
-            """, unsafe_allow_html=True)
+        # --- Render ogen exact onder elke toggle ---
+        eye_cols = st.columns(5)
+        for i, key in enumerate(toggle_keys):
+            with eye_cols[i]:
+                if st.session_state.get(key):
+                    st.markdown("<div class='eye-glow'>👁️</div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)  # lege ruimte
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1027,7 +992,7 @@ def render_active_toggle_results():
             # 1. Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
             search_term = st.text_input("Zoek op Setnaam")
 
-            # 2. Filter sets op zoekterm, volledig onafhankelijk van categorieën
+            # 2. Filter sets op zoekterm of op categorie
             if search_term:
                 sets_list = [
                     s for s in all_sets
@@ -1139,6 +1104,28 @@ def render_active_toggle_results():
             st.markdown("<style>img[alt=''] {max-height:90vh; height:auto; width:auto;}</style>", unsafe_allow_html=True)
         except:
             st.error("Afbeelding 'Sherrif - Commander.png' niet gevonden.")
+
+    # --- Sound of Magic ---
+    elif st.session_state.get("sound_magic_active", False):
+        st.subheader("")
+        st.markdown("""
+        <div style="
+            border-radius:12px;
+            padding:4px;
+            box-shadow: 0 0 15px 4px rgba(0,255,0,0.7);
+            display:block;
+			width: 100%
+        ">
+            <iframe data-testid="embed-iframe" 
+                style="border-radius:12px; width:100%; height:352px;" 
+                src="https://open.spotify.com/embed/playlist/7iBoB3zGaDwDFQTylu49RH?utm_source=generator&theme=0" 
+                frameBorder="0" allowfullscreen="" 
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                loading="lazy">
+            </iframe>
+        </div>
+        """, unsafe_allow_html=True)
+
 
 # ------------------ Aanroepen ------------------
 sidebar_toggle_expander()
