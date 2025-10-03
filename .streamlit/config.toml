@@ -1,17 +1,6 @@
 [theme]
 base = "dark"
-
-# Hoofdachtergrond: diep donkergroen
-backgroundColor = "#0f1a0f"
-
-# Secondary background: iets lichter groen voor velden en panelen
-secondaryBackgroundColor = "#1f2e1f"
-
-# Primary accent: paarsgroene gloed (knoppen, sliders, selectie)
-primaryColor = "#6b3fa0"
-
-# Tekstkleur
+primaryColor = "#5a995a"
+backgroundColor = "#150f30"
+secondaryBackgroundColor = "#1f1f1f"
 textColor = "#ffffff"
-
-# Lettertype
-font = "sans serif"
