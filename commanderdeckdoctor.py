@@ -963,10 +963,10 @@ def sidebar_toggle_expander():
         # Toggle kolommen
         cols = st.columns(5)
         toggle_keys = ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]
-        toggle_icons = ["🛡️", "🍅", "🐻", "⭐", "🎵"]
+        toggle_icons = ["🛡️", "🍎", "🐻", "⭐", "🎵"]
         toggle_help = [
             "Set Search: Zoek Set-Codes",
-            "Ketch-Up: wat heb je gemist?",
+            "Future Cards: Ketch-Up",
             "Bear Search: beren in de art",
             "Sheriff: rules and play",
             "Sound of Magic: MOB playlist"
@@ -1096,12 +1096,98 @@ def render_active_toggle_results():
         else:
             st.error("Geen sets gevonden.")
 
-    # --- Ketchup ---
+    # --- Ketch-Up toggle ---
     elif st.session_state.get("ketchup_active", False):
-        st.info("🍅 Ketchup in actie... Even geduld!")
-        st.subheader("Ketchup Items:")
-        for item in ["Ketchup Card 1","Ketchup Card 2","Ketchup Card 3"]:
-            st.markdown(f"- {item}")
+        st.subheader("Ketch-Up: Upcoming Cards")
+        spinner_ph = show_mana_spinner("Een kijkje in de toekomst...")
+
+        from datetime import date
+        today = date.today()
+
+        # --- 1️⃣ Haal alle komende sets op (cache 24 uur) ---
+        cache_key_sets = f"upcoming_sets_{today.isoformat()}"
+        upcoming_sets = cache.get(cache_key_sets)
+        if upcoming_sets is None:
+            sets_data = safe_api_call("https://api.scryfall.com/sets")
+            if not sets_data or "data" not in sets_data:
+                spinner_ph.empty()
+                st.error("Kan sets niet ophalen van Scryfall.")
+                return
+            all_sets = sets_data["data"]
+            upcoming_sets = [s for s in all_sets if s.get("released_at") and s["released_at"] > today.isoformat() and not s.get("digital", False)]
+            cache.set(cache_key_sets, upcoming_sets, expire=60*60*24)  # 24 uur cache
+
+        if not upcoming_sets:
+            spinner_ph.empty()
+            st.info("Geen komende sets gevonden.")
+            return
+
+        # --- 2️⃣ Haal alle kaarten uit deze sets op (cache per set) ---
+        spoiler_cards = []
+        for s in upcoming_sets:
+            set_code = s["code"]
+            cache_key_cards = f"ketchup_cards_{set_code}"
+            cards_in_set = cache.get(cache_key_cards)
+            if cards_in_set is None:
+                cards_in_set = scryfall_search_all_limited(f"set:{set_code}", max_cards=500)
+                cache.set(cache_key_cards, cards_in_set, expire=60*60*24)
+            spoiler_cards.extend(cards_in_set)
+
+        spinner_ph.empty()
+
+        if not spoiler_cards:
+            st.info("Geen kaarten gevonden in komende sets.")
+            return
+        
+        # --- 4️⃣ Tijdelijke melding (3 seconden) ---
+        info_ph = st.empty()
+        info_ph.info(f"{len(spoiler_cards)} kaarten gevonden in {len(upcoming_sets)} komende set(s)")
+        import time
+        time.sleep(3)
+        info_ph.empty()
+
+        # --- 3️⃣ Filter per set (optioneel) ---
+        set_options = sorted({c.get("set", "").upper(): c.get("set_name", "") for c in spoiler_cards}.items())
+        selected_sets = st.multiselect(
+            "Filter op set(s)",
+            options=[f"{code} - {name}" for code, name in set_options]
+        )
+        if selected_sets:
+            selected_codes = [s.split(" - ")[0] for s in selected_sets]
+            spoiler_cards = [c for c in spoiler_cards if c.get("set", "").upper() in selected_codes]
+
+        # --- 5️⃣ Sorteeropties ---
+        sort_option = st.selectbox(
+            "Sorteren op:",
+            options=[
+                "Geen",
+                "Naam A-Z",
+                "Naam Z-A",
+                "Mana Value Laag-Hoog",
+                "Mana Value Hoog-Laag",
+                "Releasedatum Oud-Nieuw",
+                "Releasedatum Nieuw-Oud"
+            ],
+            index=0
+        )
+
+        # --- 6️⃣ Sorteer op basis van selectbox ---
+        if sort_option != "Geen" and spoiler_cards:
+            if sort_option == "Naam A-Z":
+                spoiler_cards.sort(key=lambda c: c.get("name","").lower())
+            elif sort_option == "Naam Z-A":
+                spoiler_cards.sort(key=lambda c: c.get("name","").lower(), reverse=True)
+            elif sort_option == "Mana Value Laag-Hoog":
+                spoiler_cards.sort(key=lambda c: c.get("cmc",0))
+            elif sort_option == "Mana Value Hoog-Laag":
+                spoiler_cards.sort(key=lambda c: c.get("cmc",0), reverse=True)
+            elif sort_option == "Releasedatum Oud-Nieuw":
+                spoiler_cards.sort(key=lambda c: c.get("released_at",""))
+            elif sort_option == "Releasedatum Nieuw-Oud":
+                spoiler_cards.sort(key=lambda c: c.get("released_at",""), reverse=True)
+
+        # --- 7️⃣ Render kaarten ---
+        render_cards_with_add(spoiler_cards, columns=6)
 
     # --- Bear ---
     elif st.session_state.get("bear_search_active", False):
