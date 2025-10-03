@@ -278,34 +278,86 @@ if active_tab:
 
 # --- Landingpagina ---
 if not st.session_state.get("app_started", False) and active_tab == "":
+    # Sidebar verbergen
     st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
+
+    # Styling landingpagina
     st.markdown("""
     <style>
     .landing-container {
-        display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
-        padding-top: 0px; padding-bottom: 0px;
+        display: flex; 
+        flex-direction: column; 
+        justify-content: flex-start; 
+        align-items: center;
+        padding-top: 0px; 
+        padding-bottom: 0px;
         background: radial-gradient(circle at top left, #150f30, #001900);
-        color: white; text-align: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: white; 
+        text-align: center; 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .landing-image { max-width: 400px; width: 90%; border-radius: 16px; box-shadow: 0 12px 25px rgba(0,0,0,0.5); margin-bottom: 24px; transition: transform 0.6s ease, box-shadow 0.6s ease; }
-    .landing-image:hover { transform: rotate(2deg) scale(1.05); box-shadow: 0 20px 40px rgba(0,0,0,0.7); }
-    .landing-subtext { font-size: 18px; opacity: 0.85; margin-top: 12px; animation: fadeIn 1.2s ease-in-out; }
-    @keyframes fadeIn { from {opacity: 0; transform: translateY(20px);} to {opacity: 0.85; transform: translateY(0);} }
+    .landing-image { 
+        max-width: 400px; 
+        width: 90%; 
+        border-radius: 16px; 
+        box-shadow: 0 12px 25px rgba(0,0,0,0.5); 
+        margin-bottom: 24px; 
+        transition: transform 0.6s ease, box-shadow 0.6s ease; 
+    }
+    .landing-image:hover { 
+        transform: rotate(2deg) scale(1.05); 
+        box-shadow: 0 20px 40px rgba(0,0,0,0.7); 
+    }
+    .landing-subtext { 
+        font-size: 18px; 
+        opacity: 0.85; 
+        margin-top: 12px; 
+        animation: fadeIn 1.2s ease-in-out; 
+    }
+    @keyframes fadeIn { 
+        from {opacity: 0; transform: translateY(20px);} 
+        to {opacity: 0.85; transform: translateY(0);} 
+    }
+    .landing-btn {
+        margin-top: 16px;
+        padding: 12px 32px;
+        font-size: 20px;
+        font-weight: bold;
+        color: white;
+        background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a);
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease-in-out;
+    }
+    .landing-btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(59,124,59,0.5), 0 6px 15px rgba(59,124,59,0.3);
+        background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a);
+    }
     </style>
     """, unsafe_allow_html=True)
 
+    # Landing container
     st.markdown('<div class="landing-container">', unsafe_allow_html=True)
+
+    # Afbeelding
     if os.path.exists("12.png"):
-        st.image(Image.open("12.png"), width=400)
+        st.image(Image.open("12.png"), width=400, output_format="PNG")
     else:
         st.error("Afbeelding '12.png' niet gevonden.")
+
+    # Subtekst
     st.markdown('<div class="landing-subtext">Welkom bij CommanderDeckDoctor</div>', unsafe_allow_html=True)
 
-    if st.button("Untap - Upkeep - Draw"):
-        st.session_state.app_started = True  # landing verlaten
+    # Knop
+    if st.button("Untap - Upkeep - Draw", key="landing_btn"):
+        st.session_state.app_started = True
+        # Nieuwe manier voor directe rerun in nieuwste Streamlit
+        raise st.runtime.scriptrunner.RerunException(st._main)
 
     st.markdown('</div>', unsafe_allow_html=True)
-    st.stop()  # verdere code stopt hier zolang landing zichtbaar is
+
     
 # ---------------- Hoofdapp ----------------
 else:
@@ -696,107 +748,131 @@ with st.sidebar:
         st.session_state["user_name"] = st.text_input(
             "Gebruikersnaam",
             value=st.session_state["user_name"],
-            help="Vul een naam of ID in om je decks op te slaan"
+            help="Vul een naam of ID in om je decks op te slaan",
+            key="user_name_input"
         ).strip()
 
-        if st.session_state["user_name"]:
-            # Decks en Deck-Box van deze gebruiker laden
-            load_user_decks()
-            deck_box_cards = cache.get(get_user_deck_key() + "_cards")
-            if deck_box_cards:
-                st.session_state["deck_box"] = deck_box_cards
+        # --- Deck opties initialiseren ---
+        if "deck_options" not in st.session_state:
+            st.session_state["deck_options"] = {}
 
-            # Deck opties vullen
-            deck_options = {}
-            for deck_id in st.session_state["added_decks"]:
-                data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
-                if data:
-                    deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
-            st.session_state["deck_options"] = deck_options
+        # Alleen één keer decks laden en spinner tonen bij eerste keer invullen
+        if st.session_state["user_name"] and not st.session_state.get("decks_loaded", False):
+            user_name = st.session_state["user_name"]
 
-            # Nieuw deck toevoegen
-            new_deck_id = st.text_input(
-                "Import Deck from Archidect",
-                help="Noteer hier de getallenreeks in de URL van je deck op archidect.com"
-            )
-            if new_deck_id:
-                new_data = safe_api_call(f"https://archidekt.com/api/decks/{new_deck_id}/")
-                if new_data:
-                    new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
-                    if new_deck_id not in st.session_state["added_decks"]:
-                        st.session_state["added_decks"].append(new_deck_id)
-                        save_user_decks()  # persistente opslag per gebruiker
-                    st.session_state["deck_options"][new_deck_name] = new_deck_id
-                    st.success(f"Deck '{new_deck_name}' toegevoegd.")
-                else:
-                    st.error("Ongeldige Archidekt Deck ID.")
+            # Toon mana spinner tijdens laden
+            spinner_ph = show_mana_spinner(f"Je decks worden geladen {user_name}...")
 
-            # Deck selecteren
-            st.session_state["selected_deck_name"] = st.selectbox(
-                "My Decks",
-                [""] + list(st.session_state["deck_options"].keys()),
-                index=0,
-                help="Selecteer een deck | Geen deck geselecteerd = alle kaarten"
-            )
+            # Alles wat met laden te maken heeft binnen deze scope
+            try:
+                # Decks van deze gebruiker laden
+                load_user_decks()
+                deck_box_cards = cache.get(get_user_deck_key() + "_cards")
+                if deck_box_cards:
+                    st.session_state["deck_box"] = deck_box_cards
 
-            # ------------------ Reset deck state bij geen selectie ------------------
-            if st.session_state["selected_deck_name"] == "":
-                st.session_state.update({
-                    'deck_loaded': False,
-                    'cards': [],
-                    'deck_card_names': set(),
-                    'full_deck': [],
-                    'commanders': [],
-                    'color_identity': set(),
-                    'commander_types': set(),
-                    'last_loaded_deck': ""
-                })
+                # Deck opties vullen
+                deck_options = {}
+                for deck_id in st.session_state["added_decks"]:
+                    data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
+                    if data:
+                        deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
+                st.session_state["deck_options"] = deck_options
+
+                # Flag zetten dat decks geladen zijn
+                st.session_state["decks_loaded"] = True
+
+            finally:
+                # Spinner verwijderen pas als alles geladen is
+                spinner_ph.empty()
+
+        # --- Nieuw deck toevoegen ---
+        new_deck_id = st.text_input(
+            "Import Deck from Archidect",
+            help="Noteer hier de getallenreeks in de URL van je deck op archidect.com",
+            key="import_deck_input"
+        )
+        if new_deck_id:
+            new_data = safe_api_call(f"https://archidekt.com/api/decks/{new_deck_id}/")
+            if new_data:
+                new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
+                if new_deck_id not in st.session_state["added_decks"]:
+                    st.session_state["added_decks"].append(new_deck_id)
+                    save_user_decks()  # persistente opslag per gebruiker
+                st.session_state["deck_options"][new_deck_name] = new_deck_id
+                st.success(f"Deck '{new_deck_name}' toegevoegd.")
             else:
-                # Alleen load_deck aanroepen als functie gedefinieerd is en deck verandert
-                if "load_deck" in globals() and st.session_state["selected_deck_name"] != st.session_state.get('last_loaded_deck', ''):
-                    st.session_state['last_loaded_deck'] = st.session_state["selected_deck_name"]
-                    load_deck(st.session_state["selected_deck_name"])
+                st.error("Ongeldige Archidekt Deck ID.")
 
-            # Opties
-            st.session_state["show_deck"] = st.checkbox(
-                "Show Deck",
-                value=st.session_state.get("show_deck", False),
-                help="Toont alle kaarten in je deck"
-            )
-            st.session_state["alt_commander_toggle"] = st.checkbox(
-                "Alternative Commanders",
-                value=st.session_state.get("alt_commander_toggle", False),
-                help="Op zoek naar een andere Commander voor je Deck?"
-            )
+        # Deck selecteren
+        st.session_state["selected_deck_name"] = st.selectbox(
+            "My Decks",
+            [""] + list(st.session_state["deck_options"].keys()),
+            index=0,
+            help="Selecteer een deck | Geen deck geselecteerd = alle kaarten",
+            key="select_deck_box"
+        )
 
-            # Deck verwijderen
-            reset_checkbox = st.session_state.get("reset_delete_deck_checkbox", False)
-            delete_deck_checkbox = st.checkbox(
-                "Remove Deck",
-                value=False if reset_checkbox else st.session_state.get("delete_deck_checkbox", False),
-                key="delete_deck_checkbox",
-                help="Verwijder het geselecteerde deck uit deze lijst"
-            )
-            if reset_checkbox:
-                st.session_state["reset_delete_deck_checkbox"] = False
-
-            if delete_deck_checkbox and st.session_state["selected_deck_name"]:
-                st.warning(f"Weet je zeker dat je '{st.session_state['selected_deck_name']}' wilt verwijderen?")
-                col_confirm1, col_confirm2 = st.columns(2)
-                with col_confirm1:
-                    if st.button("Ja", key="confirm_delete_selected"):
-                        deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
-                        if deck_id_to_remove in st.session_state["added_decks"]:
-                            st.session_state["added_decks"].remove(deck_id_to_remove)
-                            save_user_decks()  # persistente opslag
-                        st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
-                        st.session_state["reset_delete_deck_checkbox"] = True
-                        st.rerun()
-                with col_confirm2:
-                    if st.button("Nee", key="cancel_delete_selected"):
-                        st.session_state["reset_delete_deck_checkbox"] = True
-                        st.rerun()
+        # ------------------ Reset deck state bij geen selectie ------------------
+        if st.session_state["selected_deck_name"] == "":
+            st.session_state.update({
+                'deck_loaded': False,
+                'cards': [],
+                'deck_card_names': set(),
+                'full_deck': [],
+                'commanders': [],
+                'color_identity': set(),
+                'commander_types': set(),
+                'last_loaded_deck': ""
+            })
         else:
+            # Alleen load_deck aanroepen als functie gedefinieerd is en deck verandert
+            if "load_deck" in globals() and st.session_state["selected_deck_name"] != st.session_state.get('last_loaded_deck', ''):
+                st.session_state['last_loaded_deck'] = st.session_state["selected_deck_name"]
+                load_deck(st.session_state["selected_deck_name"])
+
+        # Opties
+        st.session_state["show_deck"] = st.checkbox(
+            "Show Deck",
+            value=st.session_state.get("show_deck", False),
+            help="Toont alle kaarten in je deck"
+        )
+        st.session_state["alt_commander_toggle"] = st.checkbox(
+            "Alternative Commanders",
+            value=st.session_state.get("alt_commander_toggle", False),
+            help="Op zoek naar een andere Commander voor je Deck?"
+        )
+
+        # Deck verwijderen
+        reset_checkbox = st.session_state.get("reset_delete_deck_checkbox", False)
+        delete_deck_checkbox = st.checkbox(
+            "Remove Deck",
+            value=False if reset_checkbox else st.session_state.get("delete_deck_checkbox", False),
+            key="delete_deck_checkbox",
+            help="Verwijder het geselecteerde deck uit deze lijst"
+        )
+        if reset_checkbox:
+            st.session_state["reset_delete_deck_checkbox"] = False
+
+        if delete_deck_checkbox and st.session_state["selected_deck_name"]:
+            st.warning(f"Weet je zeker dat je '{st.session_state['selected_deck_name']}' wilt verwijderen?")
+            col_confirm1, col_confirm2 = st.columns(2)
+            with col_confirm1:
+                if st.button("Ja", key="confirm_delete_selected"):
+                    deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
+                    if deck_id_to_remove in st.session_state["added_decks"]:
+                        st.session_state["added_decks"].remove(deck_id_to_remove)
+                        save_user_decks()  # persistente opslag
+                    st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
+                    st.session_state["reset_delete_deck_checkbox"] = True
+                    st.rerun()
+            with col_confirm2:
+                if st.button("Nee", key="cancel_delete_selected"):
+                    st.session_state["reset_delete_deck_checkbox"] = True
+                    st.rerun()
+
+        # Alleen tonen als er geen gebruikersnaam is ingevuld
+        if not st.session_state.get("user_name", "").strip():
             st.info("Vul eerst je gebruikersnaam in om decks te beheren.")
 
 # ------------------ Helper: Multiselect auto-close ------------------
