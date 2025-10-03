@@ -1,7 +1,17 @@
 [theme]
-base = "dark"                        # dark mode basis
-primaryColor = "#3b7c3b"             # accentkleur voor knoppen, geselecteerde items, highlights
-backgroundColor = "#254627"          # hoofdachtergrond van de app
-secondaryBackgroundColor = "#1f2a1f" # achtergrond van inputvelden, selectboxes, sliders
-textColor = "#ffffff"                 # hoofdtekstkleur
+base = "dark"
 
+# Hoofdachtergrond: diep donkergroen
+backgroundColor = "#0f1a0f"
+
+# Secondary background: iets lichter groen voor velden en panelen
+secondaryBackgroundColor = "#1f2e1f"
+
+# Primary accent: paarsgroene gloed (knoppen, sliders, selectie)
+primaryColor = "#6b3fa0"
+
+# Tekstkleur
+textColor = "#ffffff"
+
+# Lettertype
+font = "sans serif"
