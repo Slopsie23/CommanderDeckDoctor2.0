@@ -974,7 +974,7 @@ def sidebar_toggle_expander():
     </style>
     """, unsafe_allow_html=True)
 
-    with st.sidebar.expander("Good Stuff", expanded=False):
+    with st.sidebar.expander("Good Stuff", expanded=True):
         st.caption("Activeer tools door ze aan/uit te zetten")
         st.markdown('<div class="toggle-button-wrapper">', unsafe_allow_html=True)
 
@@ -1163,6 +1163,73 @@ def render_active_toggle_results():
 # ------------------ Aanroepen ------------------
 sidebar_toggle_expander()
 render_active_toggle_results()
+
+# ------------------ README knop ------------------
+
+# Session state default
+st.session_state.setdefault("getting_started_active", False)
+
+# Styling identiek aan Good Stuff toggles
+st.markdown("""
+<style>
+.toggle-button-wrapper .stButton > button { 
+    width: 60px !important; 
+    height: 60px !important; 
+    border-radius: 12px !important;
+    font-size: 40px !important; 
+    font-weight: bold !important; 
+    cursor: pointer !important;
+    border: none !important; 
+    margin: 4px; 
+    background: linear-gradient(to right, #111127, #011901) !important;
+    color: white !important; 
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+    position: relative; 
+    transition: all 0.2s ease-in-out;
+}
+.toggle-button-wrapper .stButton > button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(0,255,0,0.5), 0 4px 6px rgba(0,0,0,0.5);
+    background: linear-gradient(to right, #1a1a1a, #002200) !important;
+}
+/* Actieve stijl voor Getting Started */
+.toggle-button-wrapper .stButton > button.active {
+    background: linear-gradient(to right, #003300, #005500) !important;
+    box-shadow: 0 0 12px rgba(0,255,0,0.8), 0 4px 6px rgba(0,0,0,0.5) !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Plaats knop in sidebar, los onder Good Stuff expanders
+with st.sidebar:
+    st.markdown('<div class="toggle-button-wrapper">', unsafe_allow_html=True)
+    col = st.columns(1)[0]
+
+    # Active class toevoegen als toggle actief is
+    button_class = "active" if st.session_state.get("getting_started_active", False) else ""
+    
+    # Gebruik een dummy HTML + st.button hack voor visueel effect
+    clicked = col.button("❓", key="getting_started_btn", help="Getting Started")
+    if clicked:
+        st.session_state["getting_started_active"] = not st.session_state["getting_started_active"]
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ------------------ Toon README.md in hoofdscherm als toggle actief ------------------
+if st.session_state.get("getting_started_active", False):
+    st.markdown(
+        '<div style="text-align:left; max-width:900px; margin:24px auto; font-size:16px; '
+        'line-height:1.6; background:rgba(0,0,0,0.05); padding:20px; border-radius:12px; overflow-y:auto; max-height:80vh; color:white;">',
+        unsafe_allow_html=True
+    )
+
+    readme_path = "README.md"
+    if os.path.exists(readme_path):
+        with open(readme_path, "r", encoding="utf-8") as f:
+            st.markdown(f.read(), unsafe_allow_html=True)
+    else:
+        st.error("README.md niet gevonden in projectmap.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------ OVERRIDE: Als Deck-Box open is, toon alléén Deck-Box ------------------
 if st.session_state.get("show_deck_box_in_main", False):
@@ -1551,8 +1618,7 @@ if start_btn:
     st.success(f"{len(results)} kaarten gevonden.")
     render_cards_with_add(results)
 
-
-# ------------------ Footer Toggles & Tabs ------------------
+# ------------------ Footer------------------
 def footer():
     year = datetime.datetime.now().year
     st.markdown(f"""
@@ -1576,4 +1642,3 @@ def footer():
     """, unsafe_allow_html=True)
 
 footer()
-
