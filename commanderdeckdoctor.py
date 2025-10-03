@@ -13,6 +13,7 @@ import uuid
 import tempfile
 import logging
 import io
+from datetime import datetime, timedelta
 
 # ---------------- Page config ----------------
 st.set_page_config(
@@ -694,7 +695,7 @@ with st.sidebar.expander("Decks", expanded=True):
         # --- Nieuw deck toevoegen ---
         new_deck_id = st.text_input(
             "Import Deck from Archidect",
-            help="Noteer hier de getallenreeks in de URL van je deck op archidect.com",
+            help="Noteer hier de getallenreeks in de URL van je deck op archidekt.com",
             key="import_deck_input"
         )
         if new_deck_id:
@@ -797,7 +798,7 @@ with st.sidebar.expander("Search & Find", expanded=False):
     # ---------------- Filters ----------------
     set_filter = st.text_input(
         "Set Filter (bijv. MH2,SPM)",
-        help="voer hier 1 of meerdere MTG setcodes in gescheiden met een komma",
+        help="Voer 1 of meer setcodes in (check #Good Stuff voor inspiratie), gescheiden door komma’s. Laat leeg om alle kaarten te doorzoeken, dit kan langer duren.",
         key="set_filter"
     )
 
@@ -1556,7 +1557,7 @@ if start_btn:
         base_query += f" year>={current_year-3}"
 
     # Spinner tonen tijdens ophalen
-    spinner_ph = show_mana_spinner("Analyseren kaarten...")
+    spinner_ph = show_mana_spinner("Summoning Card Wisdom…")
     results = scryfall_search_all_limited(base_query, max_cards=5000)
 
     # ------------------ Strikte lokale CI-filter (heilig voor commander) ------------------
@@ -1605,9 +1606,9 @@ if start_btn:
     st.success(f"{len(results)} kaarten gevonden.")
     render_cards_with_add(results)
 
-# ------------------ Footer------------------
+# ------------------ Footer ------------------
 def footer():
-    year = datetime.datetime.now().year
+    year = datetime.now().year
     st.markdown(f"""
     <style>
     .footer {{
