@@ -1,6 +1,6 @@
 [theme]
-base = "dark"
-primaryColor = "#5a995a"
-backgroundColor = "#150f30"
-secondaryBackgroundColor = "#1f1f1f"
-textColor = "#ffffff"
+base = "dark"                     	# dark mode basis
+primaryColor = "#155515"          	# accentkleur voor knoppen, sliders, geselecteerde items
+backgroundColor = "#150f30"       	# hoofdachtergrond
+secondaryBackgroundColor = "#1f2a1f"  	# achtergrond van inputvelden, selectboxes, sliders
+textColor = "#ffffff"             	# hoofdtekstkleur
