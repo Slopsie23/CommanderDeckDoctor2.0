@@ -19,8 +19,9 @@ st.set_page_config(
     page_title="CommanderDeckDoctor",
     page_icon="🐻",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded",
 )
+
 # ------------------ Globale CSS voor CommanderDeckDoctor ------------------
 st.markdown("""
 <style>
@@ -164,13 +165,14 @@ div[data-testid="stVerticalBlock"] {
 
 # ------------------ Logging ------------------
 logging.basicConfig(level=logging.INFO)
+
 # ------------------ DiskCache Init ------------------
 cache_dir = tempfile.mkdtemp()
 cache = diskcache.Cache(cache_dir)
 
 # ---------------- Session state ----------------
 if "app_started" not in st.session_state:
-    st.session_state.app_started = False
+    st.session_state.app_started = True  # <- direct op True, landingspagina verwijderd
 if "deck_box" not in st.session_state:
     st.session_state["deck_box"] = []
 
@@ -265,108 +267,6 @@ def load_user_decks():
                 return decks
         st.session_state["added_decks"] = []
         return []
-
-
-# ------------------ Landingpagina & Tab Logic ------------------
-# Huidige tab ophalen
-params = st.query_params
-active_tab = params.get("tab", [""])[0]  # lege string als geen tab
-
-# Als een tab actief is, start de app automatisch
-if active_tab:
-    st.session_state.app_started = True
-
-# --- Landingpagina ---
-if not st.session_state.get("app_started", False) and active_tab == "":
-    # Sidebar verbergen
-    st.markdown('<style>[data-testid="stSidebar"] {display: none;}</style>', unsafe_allow_html=True)
-
-    # Styling landingpagina
-    st.markdown("""
-    <style>
-    .landing-container {
-        display: flex; 
-        flex-direction: column; 
-        justify-content: flex-start; 
-        align-items: center;
-        padding-top: 0px; 
-        padding-bottom: 0px;
-        background: radial-gradient(circle at top left, #150f30, #001900);
-        color: white; 
-        text-align: center; 
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .landing-image { 
-        max-width: 400px; 
-        width: 90%; 
-        border-radius: 16px; 
-        box-shadow: 0 12px 25px rgba(0,0,0,0.5); 
-        margin-bottom: 24px; 
-        transition: transform 0.6s ease, box-shadow 0.6s ease; 
-    }
-    .landing-image:hover { 
-        transform: rotate(2deg) scale(1.05); 
-        box-shadow: 0 20px 40px rgba(0,0,0,0.7); 
-    }
-    .landing-subtext { 
-        font-size: 18px; 
-        opacity: 0.85; 
-        margin-top: 12px; 
-        animation: fadeIn 1.2s ease-in-out; 
-    }
-    @keyframes fadeIn { 
-        from {opacity: 0; transform: translateY(20px);} 
-        to {opacity: 0.85; transform: translateY(0);} 
-    }
-    .landing-btn {
-        margin-top: 16px;
-        padding: 12px 32px;
-        font-size: 20px;
-        font-weight: bold;
-        color: white;
-        background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a);
-        border-radius: 12px;
-        border: none;
-        cursor: pointer;
-        transition: all 0.3s ease-in-out;
-    }
-    .landing-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 15px rgba(59,124,59,0.5), 0 6px 15px rgba(59,124,59,0.3);
-        background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a);
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Landing container
-    st.markdown('<div class="landing-container">', unsafe_allow_html=True)
-
-    # Afbeelding
-    if os.path.exists("12.png"):
-        st.image(Image.open("12.png"), width=400, output_format="PNG")
-    else:
-        st.error("Afbeelding '12.png' niet gevonden.")
-
-    # Subtekst
-    st.markdown('<div class="landing-subtext">Welkom bij CommanderDeckDoctor</div>', unsafe_allow_html=True)
-
-    # Knop
-    if st.button("Untap - Upkeep - Draw", key="landing_btn"):
-        st.session_state.app_started = True
-        # Nieuwe manier voor directe rerun in nieuwste Streamlit
-        raise st.runtime.scriptrunner.RerunException(st._main)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    
-# ---------------- Hoofdapp ----------------
-else:
-    # Sidebar zichtbaar
-    st.markdown("""
-        <style>
-        [data-testid="stSidebar"] {display: block;}
-        </style>
-    """, unsafe_allow_html=True)
 
 # ------------------ Styling ------------------
 st.markdown("""
@@ -998,22 +898,26 @@ with st.sidebar.expander("Deck-Box", expanded=False):
     else:
         st.info("Je Deck-Box is nog leeg.")
 
-# ------------------ WEERGAVE Expander------------------
+# ------------------ WEERGAVE Expander ------------------
 with st.sidebar.expander("Weergave instellingen", expanded=False):
+    # Kaarten per rij
+    st.session_state.setdefault("cards_per_row", 6)
     st.session_state["cards_per_row"] = st.slider(
         "Kaarten per rij",
         min_value=1,
         max_value=9,
-        value=6,        # standaardwaarde
+        value=st.session_state["cards_per_row"],
         step=1,
         help="Kies hoeveel kaarten je naast elkaar wilt zien in de resultaten"
     )
-    # ---------------- Sort Option ----------------
+
+    # Sort Option
     sort_option = st.selectbox(
         "Sort Results:",
         ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
          "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
     )
+
 # ------------------ GOOD STUFF Expander ------------------
 def sidebar_toggle_expander():
     """Good Stuff toggles in sidebar met oog-indicatie (fade-in & glow één keer)"""
