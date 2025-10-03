@@ -614,7 +614,7 @@ def render_cards_with_add(cards, columns=None):
                         user_deck_key = get_user_deck_key()
                         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
 
-                        st.toast(f"{name} toegevoegd aan Deck-Box ✅")
+                        st.toast(f"{name} toegevoegd aan Deck-Box 💥")
 
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -644,7 +644,7 @@ with st.sidebar.expander("Decks", expanded=True):
     st.session_state["user_name"] = st.text_input(
         "Gebruikersnaam",
         value=st.session_state["user_name"],
-        help="Verzin, onthoud en vul deze in om je decks op te slaan. Gebruik deze bij iedere sessie",
+        help="Hoofdlettergevoelige naam, iedere sessie gebruiken om decks op te slaan en op te halen.",
         key="user_name_input"
     ).strip()
 
@@ -1539,26 +1539,31 @@ if "Keywords" in selected_analyses:
         keywords_selection.append(custom_keyword.strip().lower())
 
 
-# ------------------ Analyse uitvoeren (met spinner) ------------------
+# ------------------ Analyse uitvoeren (met spinner, commander CI strikt) ------------------
 if start_btn:
     codes = [code.strip() for code in set_filter.split(",") if code.strip()]
     deck_loaded = st.session_state.get('deck_loaded', False)
     ci = st.session_state.get('color_identity', set()) if deck_loaded else set()
     deck_card_names = st.session_state.get('deck_card_names', set())
 
+    # Basisquery opbouwen: géén ci-filter in Scryfall query
     if codes:
         base_query = " OR ".join([f"set:{code}" for code in codes])
-        if deck_loaded and ci:
-            base_query += " ci<=" + order_colors_wubrg(ci)
     else:
         base_query = "game:paper legal:commander"
         from datetime import datetime
         current_year = datetime.now().year
         base_query += f" year>={current_year-3}"
 
+    # Spinner tonen tijdens ophalen
     spinner_ph = show_mana_spinner("Analyseren kaarten...")
     results = scryfall_search_all_limited(base_query, max_cards=5000)
 
+    # ------------------ Strikte lokale CI-filter (heilig voor commander) ------------------
+    if ci and results:
+        results = [c for c in results if set(c.get("color_identity", [])) <= ci]
+
+    # ------------------ Type filter ------------------
     if type_filter != "All" and results:
         type_filter_lower = type_filter.lower()
         if type_filter_lower == "legendary":
@@ -1568,6 +1573,7 @@ if start_btn:
         else:
             results = [c for c in results if type_filter_lower in c.get("type_line","").lower()]
 
+    # ------------------ Analyses (Kindred / Keywords etc.) ------------------
     if selected_analyses and results:
         filtered_results = []
         for analyse in selected_analyses:
@@ -1576,11 +1582,11 @@ if start_btn:
                     filtered_results.append(card)
         results = list({c['id']: c for c in filtered_results}.values())
 
-    # Filter op rarity
+    # ------------------ Rarity filter ------------------
     if rarity_filter != "All" and results:
         results = [c for c in results if c.get("rarity", "").lower() == rarity_filter.lower()]
-    
-    # --------- SORTEER RESULTATEN ----------
+
+    # ------------------ Sorteren ------------------
     if results and sort_option != "Geen":
         if sort_option == "Naam A-Z":
             results.sort(key=lambda c: c.get("name","").lower())
