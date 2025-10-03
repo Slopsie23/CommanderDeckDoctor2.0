@@ -736,28 +736,33 @@ with st.sidebar:
     except:
         st.warning("Logo niet gevonden. Upload '12.png'.")
 
-    with st.expander("Decks", expanded=False):
+# ------------------ DECKS Expander ------------------
+with st.sidebar.expander("Decks", expanded=True):
+    # --- Gebruiker identificeren en onthouden ---
+    if "user_name" not in st.session_state:
+        st.session_state["user_name"] = ""
+    st.session_state["user_name"] = st.text_input(
+        "Gebruikersnaam",
+        value=st.session_state["user_name"],
+        help="Verzin, onthoud en vul deze in om je decks op te slaan. Gebruik deze bij iedere sessie",
+        key="user_name_input"
+    ).strip()
+
+    # Alleen tonen als er geen gebruikersnaam is ingevuld
+    if not st.session_state["user_name"]:
+        st.info("Vul eerst je gebruikersnaam in om decks te beheren.")
+    else:
         # Zorg dat de map 'data' altijd bestaat
         os.makedirs("data", exist_ok=True)
 
         st.caption("Beheer je eigen decks")
-
-        # --- Gebruiker identificeren en onthouden ---
-        if "user_name" not in st.session_state:
-            st.session_state["user_name"] = ""
-        st.session_state["user_name"] = st.text_input(
-            "Gebruikersnaam",
-            value=st.session_state["user_name"],
-            help="Vul een naam of ID in om je decks op te slaan",
-            key="user_name_input"
-        ).strip()
 
         # --- Deck opties initialiseren ---
         if "deck_options" not in st.session_state:
             st.session_state["deck_options"] = {}
 
         # Alleen één keer decks laden en spinner tonen bij eerste keer invullen
-        if st.session_state["user_name"] and not st.session_state.get("decks_loaded", False):
+        if not st.session_state.get("decks_loaded", False):
             user_name = st.session_state["user_name"]
 
             # Toon mana spinner tijdens laden
@@ -870,10 +875,6 @@ with st.sidebar:
                 if st.button("Nee", key="cancel_delete_selected"):
                     st.session_state["reset_delete_deck_checkbox"] = True
                     st.rerun()
-
-        # Alleen tonen als er geen gebruikersnaam is ingevuld
-        if not st.session_state.get("user_name", "").strip():
-            st.info("Vul eerst je gebruikersnaam in om decks te beheren.")
 
 # ------------------ Helper: Multiselect auto-close ------------------
 def close_multiselect_on_select(widget_key: str):
