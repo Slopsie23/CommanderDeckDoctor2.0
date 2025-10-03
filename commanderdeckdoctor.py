@@ -498,7 +498,6 @@ def scryfall_search_all_limited(query, max_cards=1000):
             break
     return cards[:max_cards]
 
-
 # ------------------ Deck-Box Helper ------------------
 def add_to_deck_box(card):
     """Voeg kaart toe aan Deck-Box en persistente opslag"""
@@ -963,12 +962,12 @@ def sidebar_toggle_expander():
         # Toggle kolommen
         cols = st.columns(5)
         toggle_keys = ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]
-        toggle_icons = ["🛡️", "🍎", "🐻", "⭐", "🎵"]
+        toggle_icons = ["🃏", "🍅", "🐻", "⭐", "🎵"]
         toggle_help = [
             "Set Search: Zoek Set-Codes",
-            "Future Cards: Ketch-Up",
-            "Bear Search: beren in de art",
-            "Sheriff: rules and play",
+            "Ketch-Up: Future Cards",
+            "Bear Search: Bears Rule!",
+            "Sheriff: Gametype Rules",
             "Sound of Magic: MOB playlist"
         ]
 
