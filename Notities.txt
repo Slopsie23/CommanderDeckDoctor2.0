@@ -1,6 +1,6 @@
 okt fixes:
 - Ketch-Up opnieuw maken en toevoegen
-
+- Bij lanceren RLS op supascript goed doortesten.
 
 
 Latere functies toevoegen:
@@ -20,7 +20,7 @@ UX	User Experience	Hoe de gebruiker het ervaart
 
 
 
-Repo update vis Powershell in map:
+Repo update via Powershell in map:
 
 git add .
 git commit -m "mijn update"
@@ -44,4 +44,6 @@ Fuck up(date)s van vandaag:
 
 
 PFTB8UrC.5XiAR# > Supabase WW
+https://rrnholgisiihwdwchelv.supabase.co API URL
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJybmhvbGdpc2lpaHdkd2NoZWx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzODUxNDcsImV4cCI6MjA3NDk2MTE0N30.A4w-sJOqCA9Z7QxddRxAlYPLCT9lucWNOFddriNrB8c ANON KEY
 
