@@ -13,6 +13,7 @@ import uuid
 import tempfile
 import logging
 import io
+from datetime import datetime, timedelta
 
 # ---------------- Page config ----------------
 st.set_page_config(
@@ -497,7 +498,6 @@ def scryfall_search_all_limited(query, max_cards=1000):
             break
     return cards[:max_cards]
 
-
 # ------------------ Deck-Box Helper ------------------
 def add_to_deck_box(card):
     """Voeg kaart toe aan Deck-Box en persistente opslag"""
@@ -614,7 +614,7 @@ def render_cards_with_add(cards, columns=None):
                         user_deck_key = get_user_deck_key()
                         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
 
-                        st.toast(f"{name} toegevoegd aan Deck-Box ✅")
+                        st.toast(f"{name} toegevoegd aan Deck-Box 💥")
 
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -644,7 +644,7 @@ with st.sidebar.expander("Decks", expanded=True):
     st.session_state["user_name"] = st.text_input(
         "Gebruikersnaam",
         value=st.session_state["user_name"],
-        help="Verzin, onthoud en vul deze in om je decks op te slaan. Gebruik deze bij iedere sessie",
+        help="Hoofdlettergevoelige naam, iedere sessie gebruiken om decks op te slaan en op te halen.",
         key="user_name_input"
     ).strip()
 
@@ -694,7 +694,7 @@ with st.sidebar.expander("Decks", expanded=True):
         # --- Nieuw deck toevoegen ---
         new_deck_id = st.text_input(
             "Import Deck from Archidect",
-            help="Noteer hier de getallenreeks in de URL van je deck op archidect.com",
+            help="Noteer hier de getallenreeks in de URL van je deck op archidekt.com",
             key="import_deck_input"
         )
         if new_deck_id:
@@ -797,7 +797,7 @@ with st.sidebar.expander("Search & Find", expanded=False):
     # ---------------- Filters ----------------
     set_filter = st.text_input(
         "Set Filter (bijv. MH2,SPM)",
-        help="voer hier 1 of meerdere MTG setcodes in gescheiden met een komma",
+        help="Voer 1 of meer setcodes in (check #Good Stuff voor inspiratie), gescheiden door komma’s. Laat leeg om alle kaarten te doorzoeken, dit kan langer duren.",
         key="set_filter"
     )
 
@@ -962,12 +962,12 @@ def sidebar_toggle_expander():
         # Toggle kolommen
         cols = st.columns(5)
         toggle_keys = ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]
-        toggle_icons = ["🛡️", "🍅", "🐻", "⭐", "🎵"]
+        toggle_icons = ["🃏", "🍅", "🐻", "⭐", "🎵"]
         toggle_help = [
             "Set Search: Zoek Set-Codes",
-            "Ketch-Up: wat heb je gemist?",
-            "Bear Search: beren in de art",
-            "Sheriff: rules and play",
+            "Ketch-Up: Future Cards",
+            "Bear Search: Bears Rule!",
+            "Sheriff: Gametype Rules",
             "Sound of Magic: MOB playlist"
         ]
 
@@ -1095,12 +1095,98 @@ def render_active_toggle_results():
         else:
             st.error("Geen sets gevonden.")
 
-    # --- Ketchup ---
+    # --- Ketch-Up toggle ---
     elif st.session_state.get("ketchup_active", False):
-        st.info("🍅 Ketchup in actie... Even geduld!")
-        st.subheader("Ketchup Items:")
-        for item in ["Ketchup Card 1","Ketchup Card 2","Ketchup Card 3"]:
-            st.markdown(f"- {item}")
+        st.subheader("Ketch-Up: Upcoming Cards")
+        spinner_ph = show_mana_spinner("Een kijkje in de toekomst...")
+
+        from datetime import date
+        today = date.today()
+
+        # --- 1️⃣ Haal alle komende sets op (cache 24 uur) ---
+        cache_key_sets = f"upcoming_sets_{today.isoformat()}"
+        upcoming_sets = cache.get(cache_key_sets)
+        if upcoming_sets is None:
+            sets_data = safe_api_call("https://api.scryfall.com/sets")
+            if not sets_data or "data" not in sets_data:
+                spinner_ph.empty()
+                st.error("Kan sets niet ophalen van Scryfall.")
+                return
+            all_sets = sets_data["data"]
+            upcoming_sets = [s for s in all_sets if s.get("released_at") and s["released_at"] > today.isoformat() and not s.get("digital", False)]
+            cache.set(cache_key_sets, upcoming_sets, expire=60*60*24)  # 24 uur cache
+
+        if not upcoming_sets:
+            spinner_ph.empty()
+            st.info("Geen komende sets gevonden.")
+            return
+
+        # --- 2️⃣ Haal alle kaarten uit deze sets op (cache per set) ---
+        spoiler_cards = []
+        for s in upcoming_sets:
+            set_code = s["code"]
+            cache_key_cards = f"ketchup_cards_{set_code}"
+            cards_in_set = cache.get(cache_key_cards)
+            if cards_in_set is None:
+                cards_in_set = scryfall_search_all_limited(f"set:{set_code}", max_cards=500)
+                cache.set(cache_key_cards, cards_in_set, expire=60*60*24)
+            spoiler_cards.extend(cards_in_set)
+
+        spinner_ph.empty()
+
+        if not spoiler_cards:
+            st.info("Geen kaarten gevonden in komende sets.")
+            return
+        
+        # --- 4️⃣ Tijdelijke melding (3 seconden) ---
+        info_ph = st.empty()
+        info_ph.info(f"{len(spoiler_cards)} kaarten gevonden in {len(upcoming_sets)} komende set(s)")
+        import time
+        time.sleep(3)
+        info_ph.empty()
+
+        # --- 3️⃣ Filter per set (optioneel) ---
+        set_options = sorted({c.get("set", "").upper(): c.get("set_name", "") for c in spoiler_cards}.items())
+        selected_sets = st.multiselect(
+            "Filter op set(s)",
+            options=[f"{code} - {name}" for code, name in set_options]
+        )
+        if selected_sets:
+            selected_codes = [s.split(" - ")[0] for s in selected_sets]
+            spoiler_cards = [c for c in spoiler_cards if c.get("set", "").upper() in selected_codes]
+
+        # --- 5️⃣ Sorteeropties ---
+        sort_option = st.selectbox(
+            "Sorteren op:",
+            options=[
+                "Geen",
+                "Naam A-Z",
+                "Naam Z-A",
+                "Mana Value Laag-Hoog",
+                "Mana Value Hoog-Laag",
+                "Releasedatum Oud-Nieuw",
+                "Releasedatum Nieuw-Oud"
+            ],
+            index=0
+        )
+
+        # --- 6️⃣ Sorteer op basis van selectbox ---
+        if sort_option != "Geen" and spoiler_cards:
+            if sort_option == "Naam A-Z":
+                spoiler_cards.sort(key=lambda c: c.get("name","").lower())
+            elif sort_option == "Naam Z-A":
+                spoiler_cards.sort(key=lambda c: c.get("name","").lower(), reverse=True)
+            elif sort_option == "Mana Value Laag-Hoog":
+                spoiler_cards.sort(key=lambda c: c.get("cmc",0))
+            elif sort_option == "Mana Value Hoog-Laag":
+                spoiler_cards.sort(key=lambda c: c.get("cmc",0), reverse=True)
+            elif sort_option == "Releasedatum Oud-Nieuw":
+                spoiler_cards.sort(key=lambda c: c.get("released_at",""))
+            elif sort_option == "Releasedatum Nieuw-Oud":
+                spoiler_cards.sort(key=lambda c: c.get("released_at",""), reverse=True)
+
+        # --- 7️⃣ Render kaarten ---
+        render_cards_with_add(spoiler_cards, columns=6)
 
     # --- Bear ---
     elif st.session_state.get("bear_search_active", False):
@@ -1539,26 +1625,31 @@ if "Keywords" in selected_analyses:
         keywords_selection.append(custom_keyword.strip().lower())
 
 
-# ------------------ Analyse uitvoeren (met spinner) ------------------
+# ------------------ Analyse uitvoeren (met spinner, commander CI strikt) ------------------
 if start_btn:
     codes = [code.strip() for code in set_filter.split(",") if code.strip()]
     deck_loaded = st.session_state.get('deck_loaded', False)
     ci = st.session_state.get('color_identity', set()) if deck_loaded else set()
     deck_card_names = st.session_state.get('deck_card_names', set())
 
+    # Basisquery opbouwen: géén ci-filter in Scryfall query
     if codes:
         base_query = " OR ".join([f"set:{code}" for code in codes])
-        if deck_loaded and ci:
-            base_query += " ci<=" + order_colors_wubrg(ci)
     else:
         base_query = "game:paper legal:commander"
         from datetime import datetime
         current_year = datetime.now().year
         base_query += f" year>={current_year-3}"
 
-    spinner_ph = show_mana_spinner("Analyseren kaarten...")
+    # Spinner tonen tijdens ophalen
+    spinner_ph = show_mana_spinner("Summoning Card Wisdom…")
     results = scryfall_search_all_limited(base_query, max_cards=5000)
 
+    # ------------------ Strikte lokale CI-filter (heilig voor commander) ------------------
+    if ci and results:
+        results = [c for c in results if set(c.get("color_identity", [])) <= ci]
+
+    # ------------------ Type filter ------------------
     if type_filter != "All" and results:
         type_filter_lower = type_filter.lower()
         if type_filter_lower == "legendary":
@@ -1568,6 +1659,7 @@ if start_btn:
         else:
             results = [c for c in results if type_filter_lower in c.get("type_line","").lower()]
 
+    # ------------------ Analyses (Kindred / Keywords etc.) ------------------
     if selected_analyses and results:
         filtered_results = []
         for analyse in selected_analyses:
@@ -1576,11 +1668,11 @@ if start_btn:
                     filtered_results.append(card)
         results = list({c['id']: c for c in filtered_results}.values())
 
-    # Filter op rarity
+    # ------------------ Rarity filter ------------------
     if rarity_filter != "All" and results:
         results = [c for c in results if c.get("rarity", "").lower() == rarity_filter.lower()]
-    
-    # --------- SORTEER RESULTATEN ----------
+
+    # ------------------ Sorteren ------------------
     if results and sort_option != "Geen":
         if sort_option == "Naam A-Z":
             results.sort(key=lambda c: c.get("name","").lower())
@@ -1599,9 +1691,9 @@ if start_btn:
     st.success(f"{len(results)} kaarten gevonden.")
     render_cards_with_add(results)
 
-# ------------------ Footer------------------
+# ------------------ Footer ------------------
 def footer():
-    year = datetime.datetime.now().year
+    year = datetime.now().year
     st.markdown(f"""
     <style>
     .footer {{
