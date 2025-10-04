@@ -574,6 +574,8 @@ def render_cards_with_add(cards, columns=None):
     """Render kaarten in een grid met hover-effect en gecentreerde Add-to-Deck knop.
        Toegevoegde kaarten worden per gebruiker persistent opgeslagen."""
     
+    import uuid
+
     if not cards:
         st.info("Geen kaarten om weer te geven.")
         return
@@ -599,22 +601,22 @@ def render_cards_with_add(cards, columns=None):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Maak een **unieke key** op basis van index + id/name
-                button_key = f"add_card_{i}_{col_idx}_{card.get('id', name)}"
+                # Unieke key met UUID
+                button_key = f"add_card_{i}_{col_idx}_{card.get('id', name)}_{uuid.uuid4()}"
 
                 if st.button("✚", key=button_key, help="Voeg toe aan Deck-Box"):
                     if "deck_box" not in st.session_state:
                         st.session_state["deck_box"] = []
 
-                    # checken of kaart al toegevoegd is
                     if name not in [c["name"] for c in st.session_state["deck_box"]]:
                         st.session_state["deck_box"].append(card)
 
-                        # persistente opslag per gebruiker in cache
+                        # Persistente opslag per gebruiker in cache
                         user_deck_key = get_user_deck_key()
                         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
 
                         st.toast(f"{name} toegevoegd aan Deck-Box 💥")
+
 
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -911,17 +913,25 @@ with st.sidebar.expander("Weergave instellingen", expanded=False):
         help="Kies hoeveel kaarten je naast elkaar wilt zien in de resultaten"
     )
 
-    # Sort Option
-    st.session_state["sort_option"] = st.selectbox(
-        "Sort Results:",
-        ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
-         "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"],
-        index=["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
-               "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"].index(
-                   st.session_state.get("sort_option", "Geen")
-               )
+    # Sorteeropties
+    sort_options = ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
+                    "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
+
+    # Context bepalen
+    context = "bearsearch" if st.session_state.get("bear_search_active", False) else "show_deck"
+
+    # Default sortering instellen bij eerste load
+    st.session_state.setdefault(
+        "sort_option",
+        "Naam A-Z" if context == "show_deck" else "Releasedatum Nieuw-Oud"
     )
 
+    # Selectbox aanmaken
+    st.session_state["sort_option"] = st.selectbox(
+        "Sort Results:",
+        sort_options,
+        index=sort_options.index(st.session_state["sort_option"])
+    )
 
 # ------------------ GOOD STUFF Expander ------------------
 def sidebar_toggle_expander():
@@ -1207,22 +1217,38 @@ def render_active_toggle_results():
         render_cards_with_add(future_cards, columns=columns_per_row)
 
 
-    # --- Bear ---
-    elif st.session_state.get("bear_search_active", False):
+    # ------------------ BearSearch ------------------
+    if st.session_state.get("bear_search_active", False):
         spinner_ph = show_mana_spinner("Bears Incoming...")
+
+        # 1️⃣ Kaarten ophalen
         bear_cards = scryfall_search_all_limited("art:bear", max_cards=250)
+
         spinner_ph.empty()
-        st.subheader(f"Bears Found: ({len(bear_cards)})")
+        st.subheader(f"Ik heb {len(bear_cards)} Beren voor je gevonden")
+
+        # 2️⃣ Render kaarten via de algemene renderfunctie
+        # Hier wordt de sortering ALLEEN door de sidebar bepaald
         render_cards_with_add(bear_cards)
 
     # --- Sheriff ---
     elif st.session_state.get("sheriff_active", False):
+        from pathlib import Path
+        from PIL import Image
+
         try:
-            sheriff_img = Image.open("Sherrif - Commander.png")
+            # Pad relatief aan het script
+            base_path = Path(__file__).parent
+            sheriff_path = base_path / "Sheriff.png"
+
+            sheriff_img = Image.open(sheriff_path)
             st.image(sheriff_img, use_container_width=False)
-            st.markdown("<style>img[alt=''] {max-height:90vh; height:auto; width:auto;}</style>", unsafe_allow_html=True)
-        except:
-            st.error("Afbeelding 'Sherrif - Commander.png' niet gevonden.")
+            st.markdown(
+                "<style>img[alt=''] {max-height:90vh; height:auto; width:auto;}</style>",
+                unsafe_allow_html=True
+            )
+        except FileNotFoundError:
+            st.error(f"Afbeelding '{sheriff_path}' niet gevonden.")
 
     # --- Sound of Magic ---
     elif st.session_state.get("sound_magic_active", False):
@@ -1478,11 +1504,25 @@ if st.session_state.get("deck_loaded") and st.session_state.get("show_deck", Fal
                     "name": name,
                     "image_uris": {"normal": "https://via.placeholder.com/223x310?text=Geen+afbeelding"}
                 })
+    # Sorteer kaarten op basis van sidebar selectbox
+    sort_option = st.session_state.get("sort_option", "Naam A-Z")
+    if card_objs and sort_option != "Geen":
+        if sort_option == "Naam A-Z":
+            card_objs.sort(key=lambda c: c.get("name", "").lower())
+        elif sort_option == "Naam Z-A":
+            card_objs.sort(key=lambda c: c.get("name", "").lower(), reverse=True)
+        elif sort_option == "Mana Value Laag-Hoog":
+            card_objs.sort(key=lambda c: c.get("cmc", 0))
+        elif sort_option == "Mana Value Hoog-Laag":
+            card_objs.sort(key=lambda c: c.get("cmc", 0), reverse=True)
+        elif sort_option == "Releasedatum Oud-Nieuw":
+            card_objs.sort(key=lambda c: c.get("released_at", ""))
+        elif sort_option == "Releasedatum Nieuw-Oud":
+            card_objs.sort(key=lambda c: c.get("released_at", ""), reverse=True)
 
-    # Kaarten renderen
     render_cards_with_add(card_objs)
-
     spinner_ph.empty()
+
 
 # ------------------ Alternative Commanders Block ------------------
 selected_commanders = st.session_state.get("commanders", [])
