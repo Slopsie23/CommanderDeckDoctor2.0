@@ -17,6 +17,8 @@ import tempfile
 import logging
 import io
 from datetime import datetime, timedelta
+from datetime import date
+from mtg_calendar import get_upcoming_events
 
 # ======================================================================
 # 2. CONFIG
@@ -74,7 +76,7 @@ st.markdown("""
     color: white !important;
 }
 
-/* ---------------- Groene hoofdbuttons ---------------- */
+/* ---------------- Hoofdknop ---------------- */
 div.stButton {
     width: 100% !important;
     display: flex !important;
@@ -83,23 +85,32 @@ div.stButton {
 
 div.stButton > button {
     border-radius: 12px !important;
-    background: linear-gradient(45deg, #3b7c3b, #5a995a, #4a884a) !important;
-    color: white !important;
+    background: linear-gradient(45deg, #1f3d1f, #2e562e, #244424) !important; /* Donker bosgroen */
+    color: #f5f5f5 !important;
     font-size: 22px !important;
-    font-weight: bold !important;
+    font-weight: 600 !important;
     padding: 10px 24px !important;
     border: none !important;
     cursor: pointer;
     margin-top: 12px;
-    box-shadow: 0 4px 10px rgba(59,124,59,0.5);
-    transition: all 0.3s ease-in-out;
+    box-shadow: 0 3px 8px rgba(30, 50, 30, 0.5);
+    transition: all 0.25s ease-in-out;
 }
 
 div.stButton > button:hover {
-    transform: scale(1.05) rotate(0deg) !important;
-    box-shadow: 0 0 15px rgba(59,124,59,0.5), 0 6px 15px rgba(59,124,59,0.3) !important;
-    background: linear-gradient(45deg, #5a995a, #3b7c3b, #4a884a) !important;
+    transform: scale(1.03) !important;
+    box-shadow: 0 0 15px rgba(120, 70, 160, 0.6), 0 4px 10px rgba(90, 50, 130, 0.4) !important; /* Paarse gloed */
+    background: linear-gradient(45deg, #3a1f4f, #5c2a7d, #472262) !important; /* Donkerpaars */
 }
+
+/* ---------------- Clicked / Pressed state ---------------- */
+div.stButton > button:active {
+    transform: scale(0.97) !important;
+    background: linear-gradient(45deg, #172d17, #203b20, #192f19) !important; /* Diep donkergroen */
+    box-shadow: 0 2px 4px rgba(10, 15, 10, 0.6) inset, 0 0 6px rgba(120, 70, 160, 0.3) !important; /* Ingedrukte indruk */
+    transition: all 0.1s ease-in-out;
+}
+
 
 /* ---------------- Toggle-buttons Bear/Ketchup/Set/Sheriff ---------------- */
 .toggle-button-wrapper .stButton > button { 
@@ -1050,23 +1061,64 @@ def render_active_toggle_results():
 
     # -------- 🍅 KETCH-UP Toggle --------
     elif st.session_state.get("ketchup_active", False):
-        # Toon kleinere release schedule afbeelding bovenaan
-        try:
-            from PIL import Image
-            img = Image.open("release schedule mtg 2026.png")
-            # Schaal afbeelding naar max hoogte 300px
-            img.thumbnail((img.width, 450))
-            st.image(img)
-        except Exception as e:
-            st.error(f"Afbeelding niet gevonden: {e}")
-
-        st.subheader("Ketch-Up: Upcoming Cards")
-        spinner_ph = show_mana_spinner("Back to the Future...")
-
+        from PIL import Image
         from datetime import date
+
         today = date.today().isoformat()
 
-        # --- 1️⃣ Haal alle toekomstige sets op (papier, release > vandaag) ---
+        # ---------------- Links: Afbeelding + Release Kalender ----------------
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            try:
+                img = Image.open("release schedule mtg 2026.png")
+                img.thumbnail((img.width, 450))
+                st.image(img)
+            except Exception as e:
+                st.error(f"Afbeelding niet gevonden: {e}")
+
+        with col2:
+            st.subheader("Upcoming releasedates")
+            spinner_ph = show_mana_spinner("Loading upcoming releases...")
+            events = get_upcoming_events()
+            spinner_ph.empty()
+
+            if events:
+                release_events = [e for e in events if e["Type"] == "Release"]
+
+                def sort_key(e):
+                    try:
+                        return datetime.strptime(e["Datum"], "%d-%m-%Y")
+                    except:
+                        return datetime.max
+                release_events.sort(key=sort_key)
+
+                table_html = """
+                <style>
+                table.upcoming-sets {border-collapse: collapse; width: 100%;}
+                table.upcoming-sets th, table.upcoming-sets td {
+                    border: 1px solid ##0b4726; padding: 4px; text-align: left;
+                }
+                table.upcoming-sets th { background-color: #001900; color: ##0b4726; }
+                table.upcoming-sets td { color: ##0b4726; }
+                table.upcoming-sets tr:hover { background-color: rgba(0,255,0,0.1); }
+                </style>
+                <table class="upcoming-sets">
+                <tr><th>Datum</th><th>Set</th></tr>
+                """
+                for e in release_events:
+                    table_html += f"<tr><td>{e['Datum']}</td><td>{e['Evenement']}</td></tr>"
+                table_html += "</table>"
+                st.markdown(table_html, unsafe_allow_html=True)
+            else:
+                st.info("Geen komende releases gevonden.")
+
+
+        # ---------------- Onder: Kaarten (over volledige breedte) ----------------
+        st.subheader("Card Previews")
+        spinner_ph = show_mana_spinner("Back to the Future...")
+
+        # --- 1️⃣ Haal alle toekomstige sets op ---
         cache_key_sets = f"upcoming_sets_{today}"
         upcoming_sets = cache.get(cache_key_sets)
         if upcoming_sets is None:
@@ -1080,14 +1132,14 @@ def render_active_toggle_results():
                 s for s in all_sets
                 if s.get("released_at") and s["released_at"] > today and not s.get("digital", False)
             ]
-            cache.set(cache_key_sets, upcoming_sets, expire=60*60*24)  # 24 uur cache
+            cache.set(cache_key_sets, upcoming_sets, expire=60*60*24)
 
         if not upcoming_sets:
             spinner_ph.empty()
             st.info("Geen komende sets gevonden.")
             return
 
-        # --- 2️⃣ Haal kaarten op per set (max 2000 totaal) ---
+        # --- 2️⃣ Haal kaarten op per set ---
         future_cards = []
         for s in upcoming_sets:
             set_code = s["code"]
@@ -1104,7 +1156,7 @@ def render_active_toggle_results():
             st.info("Geen kaarten gevonden in komende sets.")
             return
 
-        # --- 3️⃣ Tijdelijke melding (2 seconden) ---
+        # --- 3️⃣ Tijdelijke melding ---
         info_ph = st.empty()
         info_ph.info(f"{len(future_cards)} kaarten gevonden in {len(upcoming_sets)} komende set(s)")
         import time
@@ -1337,7 +1389,7 @@ with st.sidebar:
         st.session_state["getting_started_active"] = not st.session_state["getting_started_active"]
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ------------------ Toon README.md in hoofdscherm als toggle actief ------------------
+# ------------------ Toon README in hoofdscherm ------------------
 if st.session_state.get("getting_started_active", False):
     st.markdown(
         '<div style="text-align:left; max-width:900px; margin:24px auto; font-size:16px; '
@@ -1355,7 +1407,7 @@ if st.session_state.get("getting_started_active", False):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------
-# 6 HELPERS
+# 6 Renders
 # -----------------------------------------------
 
 # ------------------ Deck laden ------------------
@@ -1434,7 +1486,7 @@ if st.session_state.get("deck_loaded") and st.session_state.get("commanders"):
             if scry and "image_uris" in scry:
                 st.image(scry["image_uris"]["normal"], width=200, caption=name)
 
-# ------------------ Show my Deck (met caching + parallel fetching) ------------------
+# ------------------ Show my Deck ------------------
 if st.session_state.get("deck_loaded") and st.session_state.get("show_deck", False):
     st.subheader(f"Volledig Deck: {st.session_state['selected_deck_name']}")
 
@@ -1499,7 +1551,7 @@ if st.session_state.get("deck_loaded") and st.session_state.get("show_deck", Fal
     spinner_ph.empty()
 
 
-# ------------------ Alternative Commanders Block ------------------
+# ------------------ Alternative Commanders ------------------
 selected_commanders = st.session_state.get("commanders", [])
 combined_colors = set()
 
@@ -1658,8 +1710,7 @@ if "Keywords" in selected_analyses:
     if custom_keyword.strip():
         keywords_selection.append(custom_keyword.strip().lower())
 
-
-# ------------------ Analyse uitvoeren (met spinner, commander CI strikt) ------------------
+# ------------------ Analyse uitvoeren ------------------
 if start_btn:
     codes = [code.strip() for code in set_filter.split(",") if code.strip()]
     deck_loaded = st.session_state.get('deck_loaded', False)
@@ -1676,10 +1727,10 @@ if start_btn:
         base_query += f" year>={current_year-3}"
 
     # Spinner tonen tijdens ophalen
-    spinner_ph = show_mana_spinner("Resolving the Stack…")
+    spinner_ph = show_mana_spinner("Tütoring results…")
     results = scryfall_search_all_limited(base_query, max_cards=5000)
 
-    # ------------------ Strikte lokale CI-filter (heilig voor commander) ------------------
+    # ------------------ Strikte lokale CI-filter ------------------
     if ci and results:
         results = [c for c in results if set(c.get("color_identity", [])) <= ci]
 
@@ -1728,7 +1779,9 @@ if start_btn:
     render_cards_with_add(results)
 
 
-# ------------------ Footer ------------------
+# -----------------------------------------------
+# 7. Footer
+# -----------------------------------------------
 def footer():
     year = datetime.now().year
     st.markdown(f"""
