@@ -18,7 +18,6 @@ import logging
 import io
 from datetime import datetime, timedelta
 from datetime import date
-from mtg_calendar import get_upcoming_events
 
 # ======================================================================
 # 2. CONFIG
@@ -1062,7 +1061,7 @@ def render_active_toggle_results():
     # -------- 🍅 KETCH-UP Toggle --------
     elif st.session_state.get("ketchup_active", False):
         from PIL import Image
-        from datetime import date
+        from datetime import datetime, date, timezone
 
         today = date.today().isoformat()
 
@@ -1080,39 +1079,54 @@ def render_active_toggle_results():
         with col2:
             st.subheader("Upcoming releasedates")
             spinner_ph = show_mana_spinner("Loading upcoming releases...")
-            events = get_upcoming_events()
+
+            # ---- Scryfall API integratie ----
+            try:
+                r = requests.get("https://api.scryfall.com/sets")
+                r.raise_for_status()
+                all_sets = r.json().get("data", [])
+                upcoming_releases = []
+                for s in all_sets:
+                    release_str = s.get("released_at")
+                    if release_str:
+                        try:
+                            release_date = datetime.strptime(release_str, "%Y-%m-%d").date()
+                        except ValueError:
+                            continue
+                        if release_date >= datetime.now(timezone.utc).date() and not s.get("digital", False):
+                            upcoming_releases.append({
+                                "Datum": release_date.strftime("%d-%m-%Y"),
+                                "Evenement": s.get("name"),
+                                "Type": "Release"
+                            })
+                # Sorteer op datum
+                upcoming_releases.sort(key=lambda x: datetime.strptime(x["Datum"], "%d-%m-%Y"))
+            except Exception as e:
+                upcoming_releases = []
+                st.error(f"Fout bij ophalen van releases: {e}")
+
             spinner_ph.empty()
 
-            if events:
-                release_events = [e for e in events if e["Type"] == "Release"]
-
-                def sort_key(e):
-                    try:
-                        return datetime.strptime(e["Datum"], "%d-%m-%Y")
-                    except:
-                        return datetime.max
-                release_events.sort(key=sort_key)
-
+            if upcoming_releases:
                 table_html = """
                 <style>
                 table.upcoming-sets {border-collapse: collapse; width: 100%;}
                 table.upcoming-sets th, table.upcoming-sets td {
-                    border: 1px solid ##0b4726; padding: 4px; text-align: left;
+                    border: 1px solid #0b4726; padding: 4px; text-align: left;
                 }
-                table.upcoming-sets th { background-color: #001900; color: ##0b4726; }
-                table.upcoming-sets td { color: ##0b4726; }
+                table.upcoming-sets th { background-color: #001900; color: #0b4726; }
+                table.upcoming-sets td { color: #d5c6ee; }
                 table.upcoming-sets tr:hover { background-color: rgba(0,255,0,0.1); }
                 </style>
                 <table class="upcoming-sets">
                 <tr><th>Datum</th><th>Set</th></tr>
                 """
-                for e in release_events:
+                for e in upcoming_releases:
                     table_html += f"<tr><td>{e['Datum']}</td><td>{e['Evenement']}</td></tr>"
                 table_html += "</table>"
                 st.markdown(table_html, unsafe_allow_html=True)
             else:
                 st.info("Geen komende releases gevonden.")
-
 
         # ---------------- Onder: Kaarten (over volledige breedte) ----------------
         st.subheader("Card Previews")
@@ -1176,7 +1190,6 @@ def render_active_toggle_results():
         # --- 6️⃣ Render kaarten ---
         columns_per_row = st.session_state.get("cards_per_row", 6)
         render_cards_with_add(future_cards, columns=columns_per_row)
-
 
     # -------- 🐻 BEAR SEARCH Toggle --------
     if st.session_state.get("bear_search_active", False):
