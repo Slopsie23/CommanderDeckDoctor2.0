@@ -217,10 +217,12 @@ div[data-testid="stVerticalBlock"] {
 /* ---------------- Card Grid ---------------- */
 .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
     margin-top: 16px;
-    justify-content: center; /* centreren bij weinig kaarten */
+    justify-items: center;
+    align-items: start;
+    width: 100%;
 }
 
 /* ---------------- Individuele kaart-container ---------------- */
@@ -228,12 +230,15 @@ div[data-testid="stVerticalBlock"] {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
     border-radius: 16px;
-    overflow: visible;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2);
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     position: relative;
     z-index: 1;
-    padding-bottom: -2px; /* verwijder extra ruimte onderin */
+    width: 100%;
+    max-width: 240px;
 }
 
 .card-hover-container:hover {
@@ -244,10 +249,12 @@ div[data-testid="stVerticalBlock"] {
 
 /* Kaart afbeelding */
 .card-hover-container img {
-    width: 220px;
-    height: 300px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 220 / 310;
     object-fit: contain;
     border-radius: 16px 16px 0 0;
+    display: block;
     user-select: none;
 }
 
@@ -255,31 +262,14 @@ div[data-testid="stVerticalBlock"] {
 .card-name {
     text-align: center;
     color: white;
-    font-size: 14px;
-    margin: 4px 0 0;
-    padding: 0 4px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    margin: 6px 0 8px;
+    padding: 0 6px;
     width: 100%;
-}
-
-/* ---------------- Add-to-Deck knop ---------------- */
-.card-hover-button {
-    all: unset;
-    display: block;
-    margin: 6px auto 0 auto;
-    color: transparent;
-    font-size: 22px;
-    cursor: pointer;
-    transition: color 0.2s ease, transform 0.2s ease, text-shadow 0.2s ease;
-    text-align: center;
-}
-
-.card-hover-button:hover {
-    color: #00d42d;
-    transform: scale(1.3);
-    text-shadow: 0 0 8px rgba(59,124,59,0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: clamp(10px, 1.2vw, 15px); /* schaalt met scherm */
+    line-height: 1.2;
 }
 
 /* ---------------- Deckbox verwijderen knop ---------------- */
@@ -392,8 +382,25 @@ def order_colors_wubrg(colors_set):
     order = {c: i for i, c in enumerate(WUBRG_ORDER)}
     return "".join(sorted(list(colors_set), key=lambda c: order.get(c, 99)))
 
+# ------------------ Sort Cards helpers ------------------
+def sort_cards(cards, sort_option):
+    if not cards or sort_option == "Geen":
+        return cards
+    if sort_option == "Naam A-Z":
+        return sorted(cards, key=lambda c: c.get("name", "").lower())
+    elif sort_option == "Naam Z-A":
+        return sorted(cards, key=lambda c: c.get("name", "").lower(), reverse=True)
+    elif sort_option == "Mana Value Laag-Hoog":
+        return sorted(cards, key=lambda c: c.get("cmc", 0))
+    elif sort_option == "Mana Value Hoog-Laag":
+        return sorted(cards, key=lambda c: c.get("cmc", 0), reverse=True)
+    elif sort_option == "Releasedatum Oud-Nieuw":
+        return sorted(cards, key=lambda c: c.get("released_at", ""))
+    elif sort_option == "Releasedatum Nieuw-Oud":
+        return sorted(cards, key=lambda c: c.get("released_at", ""), reverse=True)
+    return cards
 
-# ------------------ User-specific Deck Helpers (Supabase + fallback) ------------------
+# ------------------ User-specific Deck Helpers ------------------
 from supabase import create_client, Client
 import streamlit as st
 import hashlib, json, os
@@ -559,11 +566,13 @@ def render_cards_with_add(cards, columns=None, context="default"):
         col_idx = i % columns
         col = grid_cols[col_idx]
         with col:
+            # Afbeelding ophalen
             img_url = card.get("image_uris", {}).get("normal") or \
                       card.get("card_faces", [{}])[0].get("image_uris", {}).get("normal") or \
                       "https://via.placeholder.com/223x310?text=Geen+afbeelding"
             name = card.get("name", "Onbekend")
 
+            # Kaart HTML container
             st.markdown(f"""
             <div class="card-hover-container">
                 <img src="{img_url}" title="{name}" />
@@ -571,8 +580,17 @@ def render_cards_with_add(cards, columns=None, context="default"):
             </div>
             """, unsafe_allow_html=True)
 
+            # Button key
             button_key = f"{context}_{i}_{card.get('id', name)}"
 
+            # Button in gecentreerde div
+            st.markdown(f"""
+            <div style="text-align:center; margin-top:6px;">
+                <!-- Streamlit button wordt hier getoond -->
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Functionele knop
             if context == "deckbox":
                 if st.button("✖", key=button_key, help="Verwijder uit Deck-Box"):
                     remove_from_deck_box(card)
@@ -581,6 +599,7 @@ def render_cards_with_add(cards, columns=None, context="default"):
                 if st.button("✚", key=button_key, help="Voeg toe aan Deck-Box"):
                     add_to_deck_box(card)
                     st.rerun()
+
                     
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -861,14 +880,9 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
     sort_options = ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
                     "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
 
-    # Context bepalen
-    context = "bearsearch" if st.session_state.get("bear_search_active", False) else "show_deck"
 
     # Default sortering instellen bij eerste load
-    st.session_state.setdefault(
-        "sort_option",
-        "Naam A-Z" if context == "show_deck" else "Releasedatum Nieuw-Oud"
-    )
+    st.session_state.setdefault("sort_option", "Releasedatum Nieuw-Oud")
 
     # Selectbox aanmaken
     st.session_state["sort_option"] = st.selectbox(
@@ -966,10 +980,10 @@ def render_active_toggle_results():
         if sets_data and "data" in sets_data:
             all_sets = sets_data["data"]
 
-            # 1. Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
+            # Zoekveld bovenaan, altijd in alle Paper Magic sets (digital=False)
             search_term = st.text_input("Zoek op Setnaam")
 
-            # 2. Filter sets op zoekterm of op categorie
+            # Filter sets op zoekterm of op categorie
             if search_term:
                 sets_list = [
                     s for s in all_sets
@@ -1000,14 +1014,14 @@ def render_active_toggle_results():
                         elif "Specials" in selected_types and set_type in ["masters","funny","promo","draft_innovation","planechase"]:
                             sets_list.append(s)
 
-            # 3. Sorteren van nieuw naar oud
+            # Sorteren van nieuw naar oud
             sets_list.sort(key=lambda s: s.get("released_at", "1900-01-01"), reverse=True)
             st.subheader(f"{len(sets_list)} MTG Sets gevonden")
 
             cols_per_row = 8
             row_cols = []
 
-            # 4. CSS voor set container, logo, naam en hover
+            # CSS voor set container, logo, naam en hover
             st.markdown("""
             <style>
             .set-container { text-align: center; margin-bottom: 16px; }
@@ -1036,7 +1050,7 @@ def render_active_toggle_results():
             </style>
             """, unsafe_allow_html=True)
 
-            # 5. Render sets per rij van 8
+            # Render sets per rij van 8
             for i, s in enumerate(sets_list):
                 code = s.get("code", "").upper()
                 name = s.get("name", "Onbekend")
@@ -1065,7 +1079,7 @@ def render_active_toggle_results():
 
         today = date.today().isoformat()
 
-        # ---------------- Links: Afbeelding + Release Kalender ----------------
+        # ---------------- Afbeelding + Release Kalender ----------------
         col1, col2 = st.columns([1, 1])
 
         with col1:
@@ -1128,11 +1142,11 @@ def render_active_toggle_results():
             else:
                 st.info("Geen komende releases gevonden.")
 
-        # ---------------- Onder: Kaarten (over volledige breedte) ----------------
+        # ---------------- Onder: Kaarten ----------------
         st.subheader("Card Previews")
         spinner_ph = show_mana_spinner("Back to the Future...")
 
-        # --- 1️⃣ Haal alle toekomstige sets op ---
+        # --- Haal alle toekomstige sets op ---
         cache_key_sets = f"upcoming_sets_{today}"
         upcoming_sets = cache.get(cache_key_sets)
         if upcoming_sets is None:
@@ -1153,7 +1167,7 @@ def render_active_toggle_results():
             st.info("Geen komende sets gevonden.")
             return
 
-        # --- 2️⃣ Haal kaarten op per set ---
+        # --- Haal kaarten op per set ---
         future_cards = []
         for s in upcoming_sets:
             set_code = s["code"]
@@ -1170,14 +1184,14 @@ def render_active_toggle_results():
             st.info("Geen kaarten gevonden in komende sets.")
             return
 
-        # --- 3️⃣ Tijdelijke melding ---
+        # --- Tijdelijke melding ---
         info_ph = st.empty()
         info_ph.info(f"{len(future_cards)} kaarten gevonden in {len(upcoming_sets)} komende set(s)")
         import time
         time.sleep(3)
         info_ph.empty()
 
-        # --- 4️⃣ Filter op set (optioneel) ---
+        # --- Filter op set (optioneel) ---
         set_options = sorted({c.get("set", "").upper(): c.get("set_name", "") for c in future_cards}.items())
         selected_sets = st.multiselect(
             "Filter op set(s)",
@@ -1186,8 +1200,11 @@ def render_active_toggle_results():
         if selected_sets:
             selected_codes = [s.split(" - ")[0] for s in selected_sets]
             future_cards = [c for c in future_cards if c.get("set", "").upper() in selected_codes]
+        
+        sort_option = st.session_state.get("sort_option", "Releasedatum Nieuw-Oud")
+        future_cards = sort_cards(future_cards, sort_option)
 
-        # --- 6️⃣ Render kaarten ---
+        # --- Render kaarten ---
         columns_per_row = st.session_state.get("cards_per_row", 6)
         render_cards_with_add(future_cards, columns=columns_per_row)
 
@@ -1201,8 +1218,9 @@ def render_active_toggle_results():
         spinner_ph.empty()
         st.subheader(f"{len(bear_cards)} Beren gevonden")
 
-        # 2️⃣ Render kaarten via de algemene renderfunctie
-        # Hier wordt de sortering ALLEEN door de sidebar bepaald
+        sort_option = st.session_state.get("sort_option", "Releasedatum Nieuw-Oud")
+        bear_cards = sort_cards(bear_cards, sort_option)
+
         render_cards_with_add(bear_cards)
 
     # -------- ⭐ SHERIFF Toggle --------
@@ -1601,6 +1619,9 @@ if st.session_state.get("alt_commander_toggle", False):
             spinner_ph.empty()
             if extra_cards:
                 st.subheader("Backgrounds & Choose a Background")
+                # Sorteer extra kaarten op basis van huidige weergaveoptie
+                sort_option = st.session_state.get("sort_option", "Releasedatum Nieuw-Oud")
+                extra_cards = sort_cards(extra_cards, sort_option)
                 render_cards_with_add(extra_cards)
             else:
                 st.info("Geen backgrounds gevonden.")
@@ -1620,29 +1641,9 @@ if st.session_state.get("alt_commander_toggle", False):
         spinner_ph.empty()
 
         if alt_commanders:
-            sort_option_alt = st.selectbox(
-                "Sorteer Alt Commanders op:",
-                [
-                    "Naam A-Z",
-                    "Naam Z-A",
-                    "Mana Value Laag-Hoog",
-                    "Mana Value Hoog-Laag",
-                    "Releasedatum Oud-Nieuw",
-                    "Releasedatum Nieuw-Oud",
-                ],
-            )
-            if sort_option_alt == "Naam A-Z":
-                alt_commanders.sort(key=lambda c: c.get("name", "").lower())
-            elif sort_option_alt == "Naam Z-A":
-                alt_commanders.sort(key=lambda c: c.get("name", "").lower(), reverse=True)
-            elif sort_option_alt == "Mana Value Laag-Hoog":
-                alt_commanders.sort(key=lambda c: c.get("cmc", 0))
-            elif sort_option_alt == "Mana Value Hoog-Laag":
-                alt_commanders.sort(key=lambda c: c.get("cmc", 0), reverse=True)
-            elif sort_option_alt == "Releasedatum Oud-Nieuw":
-                alt_commanders.sort(key=lambda c: c.get("released_at", ""))
-            elif sort_option_alt == "Releasedatum Nieuw-Oud":
-                alt_commanders.sort(key=lambda c: c.get("released_at", ""), reverse=True)
+            # Sorteer alt commanders via weergave-expander instelling
+            sort_option = st.session_state.get("sort_option", "Releasedatum Nieuw-Oud")
+            alt_commanders = sort_cards(alt_commanders, sort_option)
 
             st.subheader("Alternative Commanders")
             render_cards_with_add(alt_commanders)
