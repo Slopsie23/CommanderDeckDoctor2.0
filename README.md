@@ -21,7 +21,7 @@ Alle gegevens worden automatisch geladen via Archidekt en Scryfall.
 
 ---
 
-### 📘 Expander: Deck Management
+### 📘 Deck Management
 
 In deze expander beheer je je persoonlijke decks.  
 Je kunt decks importeren, verwijderen en bekijken.  
@@ -31,7 +31,7 @@ Sortering en layout worden centraal geregeld via de *Weergave*-expander.
 
 ---
 
-### 🧙‍♀️ Expander: Alternative Commanders & Backgrounds
+### 🧙‍♀️ Alternative Commanders & Backgrounds
 
 Toont alternatieve commanders die passen binnen de kleuridentiteit van je huidige deck.  
 Daarnaast kun je *Backgrounds* en *Choose a Background*-kaarten tonen die compatibel zijn met jouw commander.  
@@ -40,7 +40,7 @@ Je kunt kiezen of je alleen backgrounds wilt tonen of ook alternatieve commander
 
 ---
 
-### 🔍 Expander: Analyse
+### 🔍 Analyse
 
 Met de analysefunctie zoek je naar kaarten die passen bij de strategie van je deck.  
 Je kunt filteren op kaarttype, setcode, zeldzaamheid of categorie zoals Ramp, Card Advantage of Protection.  
@@ -48,7 +48,7 @@ Resultaten worden automatisch ontdubbeld en in een grid getoond, gesorteerd volg
 
 ---
 
-### 📦 Expander: Deck-Box
+### 📦 Deck-Box
 
 De Deck-Box is je persoonlijke verzamelplek voor kaarten die je wilt bewaren of later wilt toevoegen aan een deck.  
 Kaarten kunnen worden toegevoegd met de plusknop (✚) en verwijderd met de kruis-knop (✖).  
@@ -58,10 +58,9 @@ De Deck-Box werkt live zonder dat de pagina opnieuw hoeft te laden.
 
 ---
 
-### 🖥️ Expander: Weergave
+### 🖥️ Weergave
 
 De Weergave-expander bepaalt centraal de layout en sortering van alle kaarten in de app.  
-De instelling geldt voor *Deck Management*, *Alternative Commanders*, *Bear Search* en *Ketch-Up*.  
 Beschikbare sorteeropties:
 
 - Naam A–Z  
@@ -71,12 +70,12 @@ Beschikbare sorteeropties:
 - Releasedatum Oud–Nieuw  
 - Releasedatum Nieuw–Oud *(standaard)*  
 
-Daarnaast kun je instellen hoeveel kaarten per rij worden weergegeven.  
+Daarnaast kun je instellen hoeveel kaarten per rij worden weergegeven voor passende weergave bij verschillende schermformaten.  
 De gekozen instellingen worden per sessie onthouden.
 
 ---
 
-### 🎒 Expander: Good Stuff
+### 🎒 Good Stuff
 
 De *Good Stuff*-sectie bevat extra tools die de app uitbreiden met handige of leuke functies:
 
@@ -86,30 +85,28 @@ De *Good Stuff*-sectie bevat extra tools die de app uitbreiden met handige of le
 - **⭐ Sheriff** – toont spelregels of richtlijnen.  
 - **🎵 Sound of Magic** – speelt een Spotify-playlist voor Commander-avonden.  
 
-Elke tool opent automatisch in het hoofdscherm zodra de toggle is geactiveerd.
+Elke tool opent automatisch in het hoofdscherm zodra de toggle is geactiveerd en moet uit worden gezet na gebruik.
 
 ---
 
-### 🍅 Expander: Ketch-Up (vernieuwd)
+### 🍅 Ketch-Up 
 
-De vernieuwde Ketch-Up toont aankomende Magic: The Gathering-sets en kaartpreviews.  
+De  Ketch-Up toont aankomende Magic: The Gathering-sets en kaartpreviews.  
 
 **Weergave:**
-- Links een afbeelding van het releasejaar.  
+- Links een afbeelding van het komende releasejaar.  
 - Rechts een releasekalender met toekomstige sets, automatisch gesorteerd van eerstkomende naar laatstkomende datum.  
 - Daaronder kaartpreviews van komende sets, opgehaald via Scryfall.  
-
-De sortering is gekoppeld aan de Weergave-expander en kan worden aangepast op releasedatum, naam of mana value.  
+ 
 Je kunt filteren op specifieke sets via multiselectie.  
-Alle gegevens worden automatisch gecachet en dagelijks vernieuwd.
+
 
 ---
 
-### 🐻 Expander: Bear Search
+### 🐻 Bear Search
 
 Toont alle kaarten met beren in de art.  
-De resultaten worden gesorteerd volgens de huidige weergaveoptie en weergegeven in een responsieve grid.  
-Ook deze functie gebruikt caching voor snellere laadtijden.
+ 
 
 ---
 
