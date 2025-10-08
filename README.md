@@ -21,7 +21,7 @@ Alle gegevens worden automatisch geladen via Archidekt en Scryfall.
 
 ---
 
-### 📘 Deck Management
+### 📘 Mijn Decks
 
 In deze expander beheer je je persoonlijke decks.  
 Je kunt decks importeren, verwijderen en bekijken.  
@@ -31,7 +31,7 @@ Sortering en layout worden centraal geregeld via de *Weergave*-expander.
 
 ---
 
-### 🧙‍♀️ Alternative Commanders & Backgrounds
+### 🧙‍♀️ Alternative Commanders
 
 Toont alternatieve commanders die passen binnen de kleuridentiteit van je huidige deck.  
 Daarnaast kun je *Backgrounds* en *Choose a Background*-kaarten tonen die compatibel zijn met jouw commander.  
@@ -40,21 +40,11 @@ Je kunt kiezen of je alleen backgrounds wilt tonen of ook alternatieve commander
 
 ---
 
-### 🔍 Analyse
+### 🔍 Zoek en Vind
 
 Met de analysefunctie zoek je naar kaarten die passen bij de strategie van je deck.  
 Je kunt filteren op kaarttype, setcode, zeldzaamheid of categorie zoals Ramp, Card Advantage of Protection.  
 Resultaten worden automatisch ontdubbeld en in een grid getoond, gesorteerd volgens de actieve weergave-instelling.
-
----
-
-### 📦 Deck-Box
-
-De Deck-Box is je persoonlijke verzamelplek voor kaarten die je wilt bewaren of later wilt toevoegen aan een deck.  
-Kaarten kunnen worden toegevoegd met de plusknop (✚) en verwijderd met de kruis-knop (✖).  
-De inhoud blijft per gebruiker bewaard en wordt automatisch geladen bij het opstarten van de app.  
-Je kunt de inhoud exporteren, kopiëren of downloaden als CSV-bestand.  
-De Deck-Box werkt live zonder dat de pagina opnieuw hoeft te laden.
 
 ---
 
@@ -89,24 +79,13 @@ Elke tool opent automatisch in het hoofdscherm zodra de toggle is geactiveerd en
 
 ---
 
-### 🍅 Ketch-Up 
+### 📦 Deck-Box
 
-De  Ketch-Up toont aankomende Magic: The Gathering-sets en kaartpreviews.  
-
-**Weergave:**
-- Links een afbeelding van het komende releasejaar.  
-- Rechts een releasekalender met toekomstige sets, automatisch gesorteerd van eerstkomende naar laatstkomende datum.  
-- Daaronder kaartpreviews van komende sets, opgehaald via Scryfall.  
- 
-Je kunt filteren op specifieke sets via multiselectie.  
-
-
----
-
-### 🐻 Bear Search
-
-Toont alle kaarten met beren in de art.  
- 
+De Deck-Box is je persoonlijke verzamelplek voor kaarten die je wilt bewaren of later wilt toevoegen aan een deck.  
+Kaarten kunnen worden toegevoegd met de plusknop (✚) en verwijderd met de kruis-knop (✖).  
+De inhoud blijft per gebruiker bewaard en wordt automatisch geladen bij het opstarten van de app.  
+Je kunt de inhoud exporteren, kopiëren of downloaden als CSV-bestand.  
+De Deck-Box werkt live zonder dat de pagina opnieuw hoeft te laden.
 
 ---
 
