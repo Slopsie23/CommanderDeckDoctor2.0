@@ -1499,7 +1499,7 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
         if st.session_state["beheer_ingelogd"]:
             if st.button("Open Beheer", key="open_beheer_btn"):
                 try:
-                    st.switch_page("pages/1_CDD_Beheer.py")
+                    st.switch_page("CDD Beheer")
                 except Exception:
                     st.error("De beheerpagina kon niet worden gevonden. Controleer de bestandsnaam in /pages.")
 
