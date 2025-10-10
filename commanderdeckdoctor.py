@@ -24,7 +24,6 @@ import pandas as pd
 # ======================================================================
 # 2. CONFIG
 # ======================================================================
-
 st.set_page_config(
     page_title="CommanderDeckDoctor",
     page_icon="🐻",
@@ -1448,12 +1447,13 @@ if st.session_state.get("getting_started_active", False):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------
-# 🔒 Beheeroptie (alleen zichtbaar voor Slopsie)
+# 🔒 Beheeroptie sidebar (alleen zichtbaar voor Slopsie)
 # -----------------------------------------------
 import streamlit as st
 
 # Alleen zichtbaar voor Slopsie
 if st.session_state.get("user_name", "").strip().lower() == "slopsie":
+
     with st.sidebar.expander("🔧 Beheer", expanded=False):
         # CSS voor de knop
         st.markdown(
@@ -1476,33 +1476,46 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
                 background: linear-gradient(135deg, #4cc9f0, #4895ef);
                 transform: scale(1.02);
             }
+            .login-status {
+                color: #00ff00;
+                font-weight: bold;
+                margin-top: 5px;
+            }
             </style>
             """,
             unsafe_allow_html=True
         )
 
-        # Session state flag
+        # Session state flags
         if "beheer_ingelogd" not in st.session_state:
             st.session_state["beheer_ingelogd"] = False
 
-        # Inloggen
+        # Login formulier
         if not st.session_state["beheer_ingelogd"]:
-            wachtwoord = st.text_input("Voer beheerderswachtwoord in:", type="password")
+            wachtwoord_input = st.text_input("Voer beheerderswachtwoord in:", type="password")
             if st.button("Inloggen", key="beheer_login_btn"):
-                if wachtwoord == st.secrets.get("BEHEER_WACHTWOORD", ""):
+                secret_pw = st.secrets.get("BEHEER_WACHTWOORD", "").strip()
+                if wachtwoord_input.strip() == secret_pw:
                     st.session_state["beheer_ingelogd"] = True
                     st.success("Toegang verleend ✅")
                 else:
                     st.error("Onjuist wachtwoord.")
 
-        # Toegang verleend
+        # Toegang verleend sectie
         if st.session_state["beheer_ingelogd"]:
+            st.markdown("<div class='login-status'>Slopsie is ingelogd ✅</div>", unsafe_allow_html=True)
+
+            # Knop: Open Beheer
             if st.button("Open Beheer", key="open_beheer_btn"):
                 try:
-                    st.switch_page("CDD Beheer")
+                    st.switch_page("CDD Beheer")  # exacte pagina titel in sidebar
                 except Exception:
-                    st.error("De beheerpagina kon niet worden gevonden. Controleer de bestandsnaam in /pages.")
+                    st.error(
+                        "De beheerpagina kon niet worden gevonden. "
+                        "Controleer de paginanaam in /pages (exact zoals in de sidebar)."
+                    )
 
+            # Knop: Uitloggen
             if st.button("Uitloggen", key="beheer_logout_btn"):
                 st.session_state["beheer_ingelogd"] = False
                 st.success("Uitgelogd ✅")
