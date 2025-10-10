@@ -5,6 +5,14 @@ import requests
 from PIL import Image
 import time
 
+# Beveiliging: alleen toegankelijk voor Slopsie die is ingelogd
+if (
+    st.session_state.get("user_name", "").strip().lower() != "slopsie"
+    or not st.session_state.get("beheer_ingelogd", False)
+):
+    st.error("Je hebt geen toegang tot deze pagina.")
+    st.stop()
+
 st.set_page_config(layout="wide")
 
 # ------------------ Achtergrond gradient ------------------
