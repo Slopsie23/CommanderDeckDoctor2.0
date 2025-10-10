@@ -1482,21 +1482,24 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
             unsafe_allow_html=True
         )
 
-        # Session state voor beheer toegang
+        # Session state flags
         if "beheer_toegang" not in st.session_state:
             st.session_state["beheer_toegang"] = False
+        if "beheer_ingelogd" not in st.session_state:
+            st.session_state["beheer_ingelogd"] = False
 
         # Inloggedeelte
-        if not st.session_state["beheer_toegang"]:
+        if not st.session_state["beheer_ingelogd"]:
             wachtwoord = st.text_input("Voer beheerderswachtwoord in:", type="password")
             if st.button("Inloggen", key="beheer_login_btn"):
                 if wachtwoord == st.secrets.get("BEHEER_WACHTWOORD", ""):
                     st.session_state["beheer_toegang"] = True
+                    st.session_state["beheer_ingelogd"] = True
                 else:
                     st.error("Onjuist wachtwoord.")
 
         # Toegang verleend
-        if st.session_state["beheer_toegang"]:
+        if st.session_state["beheer_ingelogd"]:
             st.success("Toegang verleend ✅")
 
             # Detecteer automatisch lokaal of cloud
@@ -1522,7 +1525,9 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
             # Uitloggen
             if st.button("Uitloggen", key="beheer_logout_btn"):
                 st.session_state["beheer_toegang"] = False
+                st.session_state["beheer_ingelogd"] = False
                 st.success("Uitgelogd ✅")
+
 
 # -----------------------------------------------
 # 6 Renders
