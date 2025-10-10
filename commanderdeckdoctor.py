@@ -1451,7 +1451,6 @@ if st.session_state.get("getting_started_active", False):
 # 🔒 Beheeroptie (alleen zichtbaar voor Slopsie)
 # -----------------------------------------------
 import streamlit as st
-import socket
 
 # Alleen zichtbaar voor Slopsie
 if st.session_state.get("user_name", "").strip().lower() == "slopsie":
@@ -1482,52 +1481,31 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
             unsafe_allow_html=True
         )
 
-        # Session state flags
-        if "beheer_toegang" not in st.session_state:
-            st.session_state["beheer_toegang"] = False
+        # Session state flag
         if "beheer_ingelogd" not in st.session_state:
             st.session_state["beheer_ingelogd"] = False
 
-        # Inloggedeelte
+        # Inloggen
         if not st.session_state["beheer_ingelogd"]:
             wachtwoord = st.text_input("Voer beheerderswachtwoord in:", type="password")
             if st.button("Inloggen", key="beheer_login_btn"):
                 if wachtwoord == st.secrets.get("BEHEER_WACHTWOORD", ""):
-                    st.session_state["beheer_toegang"] = True
                     st.session_state["beheer_ingelogd"] = True
+                    st.success("Toegang verleend ✅")
                 else:
                     st.error("Onjuist wachtwoord.")
 
         # Toegang verleend
         if st.session_state["beheer_ingelogd"]:
-            st.success("Toegang verleend ✅")
+            if st.button("Open Beheer", key="open_beheer_btn"):
+                try:
+                    st.switch_page("pages/1_CDD_Beheer.py")
+                except Exception:
+                    st.error("De beheerpagina kon niet worden gevonden. Controleer de bestandsnaam in /pages.")
 
-            # Detecteer automatisch lokaal of cloud
-            try:
-                hostname = socket.gethostname()
-                local_ip = socket.gethostbyname(hostname)
-                lokaal = local_ip.startswith("127.") or local_ip.startswith("192.") or local_ip.startswith("10.")
-            except:
-                lokaal = False
-
-            # Kies juiste URL
-            if lokaal:
-                beheer_url = "http://localhost:8501/CDD_Beheer"
-            else:
-                beheer_url = st.secrets.get("BEHEER_APP_URL", "#")
-
-            # Beheer knop
-            st.markdown(
-                f"<a class='beheer-btn' href='{beheer_url}' target='_blank'>Open Beheer</a>",
-                unsafe_allow_html=True
-            )
-
-            # Uitloggen
             if st.button("Uitloggen", key="beheer_logout_btn"):
-                st.session_state["beheer_toegang"] = False
                 st.session_state["beheer_ingelogd"] = False
                 st.success("Uitgelogd ✅")
-
 
 # -----------------------------------------------
 # 6 Renders
