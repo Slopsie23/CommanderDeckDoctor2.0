@@ -1446,11 +1446,17 @@ if st.session_state.get("getting_started_active", False):
         st.error("README.md niet gevonden in projectmap.")
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 # -----------------------------------------------
 # 🔒 Beheeroptie (alleen zichtbaar voor Slopsie)
 # -----------------------------------------------
+import streamlit as st
+import socket
+
+# Alleen zichtbaar voor Slopsie
 if st.session_state.get("user_name", "").strip().lower() == "slopsie":
     with st.sidebar.expander("🔧 Beheer", expanded=False):
+        # CSS voor de knop
         st.markdown(
             """
             <style>
@@ -1463,6 +1469,9 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
                 font-weight: 600;
                 cursor: pointer;
                 transition: 0.2s;
+                text-decoration: none;
+                display: inline-block;
+                text-align: center;
             }
             .beheer-btn:hover {
                 background: linear-gradient(135deg, #4cc9f0, #4895ef);
@@ -1473,25 +1482,47 @@ if st.session_state.get("user_name", "").strip().lower() == "slopsie":
             unsafe_allow_html=True
         )
 
+        # Session state voor beheer toegang
         if "beheer_toegang" not in st.session_state:
             st.session_state["beheer_toegang"] = False
 
+        # Inloggedeelte
         if not st.session_state["beheer_toegang"]:
             wachtwoord = st.text_input("Voer beheerderswachtwoord in:", type="password")
             if st.button("Inloggen", key="beheer_login_btn"):
                 if wachtwoord == st.secrets.get("BEHEER_WACHTWOORD", ""):
                     st.session_state["beheer_toegang"] = True
-                    st.success("Toegang verleend!")
-                    st.rerun()
                 else:
                     st.error("Onjuist wachtwoord.")
-        else:
+
+        # Toegang verleend
+        if st.session_state["beheer_toegang"]:
             st.success("Toegang verleend ✅")
-            beheer_url = f"{st.secrets.get('APP_URL', '')}/💼_CDD_Beheer"
-            st.markdown(f"<a class='beheer-btn' href='{beheer_url}' target='_blank'>Open Beheer</a>", unsafe_allow_html=True)
+
+            # Detecteer automatisch lokaal of cloud
+            try:
+                hostname = socket.gethostname()
+                local_ip = socket.gethostbyname(hostname)
+                lokaal = local_ip.startswith("127.") or local_ip.startswith("192.") or local_ip.startswith("10.")
+            except:
+                lokaal = False
+
+            # Kies juiste URL
+            if lokaal:
+                beheer_url = "http://localhost:8501/CDD_Beheer"
+            else:
+                beheer_url = st.secrets.get("BEHEER_APP_URL", "#")
+
+            # Beheer knop
+            st.markdown(
+                f"<a class='beheer-btn' href='{beheer_url}' target='_blank'>Open Beheer</a>",
+                unsafe_allow_html=True
+            )
+
+            # Uitloggen
             if st.button("Uitloggen", key="beheer_logout_btn"):
                 st.session_state["beheer_toegang"] = False
-                st.rerun()
+                st.success("Uitgelogd ✅")
 
 # -----------------------------------------------
 # 6 Renders
