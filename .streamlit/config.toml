@@ -3,3 +3,5 @@ primaryColor="#23481c"
 backgroundColor="#150f30"
 secondaryBackgroundColor="#1f1f1f"
 textColor="#ffffff"
+[server]
+multiApp = true
