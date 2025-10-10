@@ -33,79 +33,18 @@ st.set_page_config(
 )
 
 # ------------------ Logging ------------------
-logging.basicConfig(level=logging.WARNING)  # alleen waarschuwingen en errors tonen
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # ------------------ User & Deck Data Helpers ------------------
 LOCAL_DATA_DIR = "data"
 os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
 
-# ------------------ User Key ------------------
-if "user_name" not in st.session_state:
-    st.session_state["user_name"] = ""
-
-def get_user_deck_key():
-    """Geeft de unieke sleutel van de huidige gebruiker terug."""
-    user_name = st.session_state.get("user_name", "").strip().lower()
-    if not user_name:
-        return None
-    return user_name
-
-user_key = get_user_deck_key()
-
-# ------------------ User Decks ------------------
-def save_user_decks():
-    """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
-    user_key = get_user_deck_key()
-    decks = st.session_state.get("added_decks", [])
-    if not user_key:
-        return
-    try:
-        existing = supabase.table("user_decks").select("*").eq("user_name", user_key).maybe_single().execute()
-        if existing and hasattr(existing, "data") and existing.data:
-            supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_key).execute()
-        else:
-            supabase.table("user_decks").insert({"user_name": user_key, "deck_data": decks}).execute()
-    except Exception:
-        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_key}.json")
-        with open(json_file, "w", encoding="utf-8") as f:
-            json.dump(decks, f, ensure_ascii=False, indent=2)
-
-def load_user_decks():
-    """Laad decks van de huidige gebruiker uit Supabase of lokaal JSON."""
-    user_key = get_user_deck_key()
-    if not user_key:
-        return []
-    try:
-        res = supabase.table("user_decks").select("deck_data").eq("user_name", user_key).maybe_single().execute()
-        data = getattr(res, "data", None)
-        if data and "deck_data" in data:
-            st.session_state["added_decks"] = data["deck_data"]
-            return data["deck_data"]
-        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_key}.json")
-        if os.path.exists(json_file):
-            with open(json_file, "r", encoding="utf-8") as f:
-                decks = json.load(f)
-                st.session_state["added_decks"] = decks
-                return decks
-        st.session_state["added_decks"] = []
-        return []
-    except Exception:
-        return []
-
-# ------------------ Init: Gebruiker & Data ------------------
-if not user_key or user_key.lower() == "guest":
-    st.session_state.setdefault("added_decks", [])
-    st.session_state.setdefault("deck_box", [])
-else:
-    if "added_decks" not in st.session_state or st.session_state["added_decks"] is None:
-        st.session_state["added_decks"] = load_user_decks()
-    if "deck_box" not in st.session_state or st.session_state["deck_box"] is None:
-        st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
-
 # ------------------ DiskCache Init ------------------
 cache_dir = tempfile.mkdtemp()
 cache = diskcache.Cache(cache_dir)
-
 
 # ---------------- Session state defaults ------------------
 for key, default in {
@@ -525,7 +464,7 @@ def scryfall_search_all_limited(query, max_cards=1000):
             break
     return cards[:max_cards]
 
-# ------------------ User-specific Deck Helpers ------------------
+# ------------------ Supabase: Mijn Deck Helpers ------------------
 # Supabase client instellen
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -541,7 +480,19 @@ def get_user_deck_key():
     if not user_name:
         return None
     return user_name.lower()
+# Initialize user_key vroeg in de sessie
+user_key = get_user_deck_key()
 
+# ------------------ Init: Gebruiker & Data ------------------
+if not user_key or user_key.lower() == "guest":
+    st.session_state.setdefault("added_decks", [])
+    st.session_state.setdefault("deck_box", [])
+else:
+    if "added_decks" not in st.session_state or st.session_state["added_decks"] is None:
+        st.session_state["added_decks"] = load_user_decks()
+    if "deck_box" not in st.session_state or st.session_state["deck_box"] is None:
+        st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
+        
 # ------------------ User Decks ------------------
 def save_user_decks():
     """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
@@ -593,48 +544,40 @@ def load_user_decks():
         st.session_state["added_decks"] = []
         return []
 
-# ----------Deck-Box helpers (Supabase) ----------
+# ----------Supabase: Deck-Box helpers ----------
 def save_user_deckbox_cards(user_name: str, cards: list) -> bool:
-    """Persistente opslag van deck-box kaarten in Supabase. Return True bij succes."""
-    if not user_name:
+    """Sla de Deck-Box kaarten van een gebruiker op in Supabase."""
+    if not user_name or user_name.lower() == "guest":
         return False
-    if user_name.lower() == "guest":
-        return False
-
     try:
-        res = supabase.table("user_deckbox").upsert(
+        supabase.table("user_deckbox").upsert(
             {"user_name": user_name, "cards": cards},
             on_conflict=["user_name"]
         ).execute()
-        if getattr(res, "error", None):
-            logging.warning(f"Upsert gaf error: {res.error}")
         return True
     except Exception as e:
-        logging.exception(f"Kon deckbox niet opslaan voor {user_name}: {e}")
+        logging.warning(f"Deck-Box niet opgeslagen voor {user_name}: {e}")
         return False
 
+
 def load_user_deckbox_cards(user_name: str) -> list:
-    """Laad deck-box kaarten uit Supabase. Robuuste handling van '204 Missing response'."""
+    """Laad de Deck-Box kaarten van een gebruiker uit Supabase."""
     if not user_name or user_name.lower() == "guest":
         return []
-
     try:
         res = supabase.table("user_deckbox").select("cards").eq("user_name", user_name).maybe_single().execute()
-        if isinstance(res, dict) and res.get("code") in (204, "204"):
-            return []
-        error = getattr(res, "error", None)
-        if isinstance(error, dict) and error.get("code") in (204, "204"):
-            return []
         data = getattr(res, "data", None)
-        if data:
-            if isinstance(data, dict):
-                return data.get("cards", []) or []
-            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
-                return data[0].get("cards", []) or []
+        if not data:
+            return []
+        if isinstance(data, dict):
+            return data.get("cards", []) or []
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            return data[0].get("cards", []) or []
         return []
     except Exception as e:
-        logging.exception(f"Fout bij laden Deck-Box voor {user_name}: {e}")
+        logging.warning(f"Kon Deck-Box niet laden voor {user_name}: {e}")
         return []
+
 
 # ------------------ Deck-Box Helper ------------------
 def add_to_deck_box(card):
@@ -668,6 +611,7 @@ def remove_from_deck_box(card):
     ]
     save_user_deckbox_cards(user_key, st.session_state["deck_box"])
     st.toast(f"{card.get('name')} verwijderd uit Deck-Box")
+print("✅ Dubbele deckfuncties verwijderd – enkel moderne versies actief.")
 
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -1502,6 +1446,52 @@ if st.session_state.get("getting_started_active", False):
         st.error("README.md niet gevonden in projectmap.")
 
     st.markdown('</div>', unsafe_allow_html=True)
+# -----------------------------------------------
+# 🔒 Beheeroptie (alleen zichtbaar voor Slopsie)
+# -----------------------------------------------
+if st.session_state.get("user_name", "").strip().lower() == "slopsie":
+    with st.sidebar.expander("🔧 Beheer", expanded=False):
+        st.markdown(
+            """
+            <style>
+            .beheer-btn {
+                background: linear-gradient(135deg, #3a0ca3, #7209b7);
+                color: white;
+                border: none;
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: 0.2s;
+            }
+            .beheer-btn:hover {
+                background: linear-gradient(135deg, #4cc9f0, #4895ef);
+                transform: scale(1.02);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if "beheer_toegang" not in st.session_state:
+            st.session_state["beheer_toegang"] = False
+
+        if not st.session_state["beheer_toegang"]:
+            wachtwoord = st.text_input("Voer beheerderswachtwoord in:", type="password")
+            if st.button("Inloggen", key="beheer_login_btn"):
+                if wachtwoord == st.secrets.get("BEHEER_WACHTWOORD", ""):
+                    st.session_state["beheer_toegang"] = True
+                    st.success("Toegang verleend!")
+                    st.rerun()
+                else:
+                    st.error("Onjuist wachtwoord.")
+        else:
+            st.success("Toegang verleend ✅")
+            beheer_url = f"{st.secrets.get('APP_URL', '')}/💼_CDD_Beheer"
+            st.markdown(f"<a class='beheer-btn' href='{beheer_url}' target='_blank'>Open Beheer</a>", unsafe_allow_html=True)
+            if st.button("Uitloggen", key="beheer_logout_btn"):
+                st.session_state["beheer_toegang"] = False
+                st.rerun()
 
 # -----------------------------------------------
 # 6 Renders
