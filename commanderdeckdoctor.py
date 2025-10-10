@@ -19,6 +19,7 @@ import io
 from datetime import datetime, timedelta
 from datetime import date
 from supabase import create_client, Client
+import pandas as pd
 
 # ======================================================================
 # 2. CONFIG
@@ -30,19 +31,83 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 # ------------------ Logging ------------------
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)  # alleen waarschuwingen en errors tonen
+
+# ------------------ User & Deck Data Helpers ------------------
+LOCAL_DATA_DIR = "data"
+os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
+
+# ------------------ User Key ------------------
+if "user_name" not in st.session_state:
+    st.session_state["user_name"] = ""
+
+def get_user_deck_key():
+    """Geeft de unieke sleutel van de huidige gebruiker terug."""
+    user_name = st.session_state.get("user_name", "").strip().lower()
+    if not user_name:
+        return None
+    return user_name
+
+user_key = get_user_deck_key()
+
+# ------------------ User Decks ------------------
+def save_user_decks():
+    """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
+    user_key = get_user_deck_key()
+    decks = st.session_state.get("added_decks", [])
+    if not user_key:
+        return
+    try:
+        existing = supabase.table("user_decks").select("*").eq("user_name", user_key).maybe_single().execute()
+        if existing and hasattr(existing, "data") and existing.data:
+            supabase.table("user_decks").update({"deck_data": decks}).eq("user_name", user_key).execute()
+        else:
+            supabase.table("user_decks").insert({"user_name": user_key, "deck_data": decks}).execute()
+    except Exception:
+        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_key}.json")
+        with open(json_file, "w", encoding="utf-8") as f:
+            json.dump(decks, f, ensure_ascii=False, indent=2)
+
+def load_user_decks():
+    """Laad decks van de huidige gebruiker uit Supabase of lokaal JSON."""
+    user_key = get_user_deck_key()
+    if not user_key:
+        return []
+    try:
+        res = supabase.table("user_decks").select("deck_data").eq("user_name", user_key).maybe_single().execute()
+        data = getattr(res, "data", None)
+        if data and "deck_data" in data:
+            st.session_state["added_decks"] = data["deck_data"]
+            return data["deck_data"]
+        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_key}.json")
+        if os.path.exists(json_file):
+            with open(json_file, "r", encoding="utf-8") as f:
+                decks = json.load(f)
+                st.session_state["added_decks"] = decks
+                return decks
+        st.session_state["added_decks"] = []
+        return []
+    except Exception:
+        return []
+
+# ------------------ Init: Gebruiker & Data ------------------
+if not user_key or user_key.lower() == "guest":
+    st.session_state.setdefault("added_decks", [])
+    st.session_state.setdefault("deck_box", [])
+else:
+    if "added_decks" not in st.session_state or st.session_state["added_decks"] is None:
+        st.session_state["added_decks"] = load_user_decks()
+    if "deck_box" not in st.session_state or st.session_state["deck_box"] is None:
+        st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
 
 # ------------------ DiskCache Init ------------------
 cache_dir = tempfile.mkdtemp()
 cache = diskcache.Cache(cache_dir)
 
-# ---------------- Session state ----------------
-if "app_started" not in st.session_state:
-    st.session_state.app_started = True  # <- direct op True, landingspagina verwijderd
-if "deck_box" not in st.session_state:
-    st.session_state["deck_box"] = []
 
+# ---------------- Session state defaults ------------------
 for key, default in {
     'bear_search_active': False, 'deck_loaded': False, 'show_deck': False,
     'alt_commander_toggle': False, 'start_analysis': False,
@@ -52,7 +117,6 @@ for key, default in {
     'sheriff_active': False
 }.items():
     st.session_state.setdefault(key, default)
-
 
 # ======================================================================
 # 3 Global CSS
@@ -297,6 +361,21 @@ div[data-testid="stVerticalBlock"] {
 # 4 HELPERS
 # ======================================================================
 
+
+# ------------------ Multiselect auto-close ------------------
+def close_multiselect_on_select(widget_key: str):
+    st.markdown(f"""
+    <script>
+    const observer = new MutationObserver(() => {{
+        const el = window.parent.document.querySelector('div[data-testid="stMultiSelect"]');
+        if (el) {{
+            el.blur();  // sluit de multiselect direct na een selectie
+        }}
+    }});
+    observer.observe(window.parent.document.body, {{ childList: true, subtree: true }});
+    </script>
+    """, unsafe_allow_html=True)
+
 # ------------------ Mana Spinner helper ------------------
 st.markdown("""
 <style>
@@ -460,13 +539,15 @@ def get_user_deck_key():
     """Genereer een unieke key gebaseerd op de gebruikersnaam (default: Guest)."""
     user_name = st.session_state.get("user_name", "").strip()
     if not user_name:
-        user_name = "Guest"
-    return user_name
+        return None
+    return user_name.lower()
 
 # ------------------ User Decks ------------------
 def save_user_decks():
     """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
     user_name = get_user_deck_key()
+    if not user_name:
+        return
     decks = st.session_state.get("added_decks", [])
 
     try:
@@ -477,6 +558,7 @@ def save_user_decks():
             supabase.table("user_decks").insert({"user_name": user_name, "deck_data": decks}).execute()
     except Exception as e:
         st.warning(f"Supabase niet bereikbaar, fallback naar lokaal JSON: {e}")
+        os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
         json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
         with open(json_file, "w", encoding="utf-8") as f:
             json.dump(decks, f, ensure_ascii=False, indent=2)
@@ -484,20 +566,22 @@ def save_user_decks():
 def load_user_decks():
     """Haal decks op uit Supabase. Fallback naar lokaal JSON als Supabase faalt of geen rijen."""
     user_name = get_user_deck_key()
+    if not user_name:
+        return []
     try:
         response = supabase.table("user_decks").select("deck_data").eq("user_name", user_name).maybe_single().execute()
         if response and hasattr(response, "data") and response.data and "deck_data" in response.data:
             st.session_state["added_decks"] = response.data["deck_data"]
             return response.data["deck_data"]
-        else:
-            json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
-            if os.path.exists(json_file):
-                with open(json_file, "r", encoding="utf-8") as f:
-                    decks = json.load(f)
-                    st.session_state["added_decks"] = decks
-                    return decks
-            st.session_state["added_decks"] = []
-            return []
+        # fallback lokaal
+        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
+        if os.path.exists(json_file):
+            with open(json_file, "r", encoding="utf-8") as f:
+                decks = json.load(f)
+                st.session_state["added_decks"] = decks
+                return decks
+        st.session_state["added_decks"] = []
+        return []
     except Exception as e:
         st.warning(f"Supabase niet bereikbaar, fallback naar lokaal JSON: {e}")
         json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}.json")
@@ -509,82 +593,81 @@ def load_user_decks():
         st.session_state["added_decks"] = []
         return []
 
-# ------------------ User Deck-Box ------------------
-def save_user_deckbox():
-    """Sla de Deck-Box op per gebruiker in Supabase, fallback naar lokaal JSON."""
-    user_name = get_user_deck_key()
-    deck_box = st.session_state.get("deck_box", [])
+# ----------Deck-Box helpers (Supabase) ----------
+def save_user_deckbox_cards(user_name: str, cards: list) -> bool:
+    """Persistente opslag van deck-box kaarten in Supabase. Return True bij succes."""
+    if not user_name:
+        return False
+    if user_name.lower() == "guest":
+        return False
 
     try:
-        existing = supabase.table("user_deckboxes").select("*").eq("user_name", user_name).maybe_single().execute()
-        if existing and existing.data:
-            supabase.table("user_deckboxes").update({"deck_box": deck_box}).eq("user_name", user_name).execute()
-        else:
-            supabase.table("user_deckboxes").insert({"user_name": user_name, "deck_box": deck_box}).execute()
+        res = supabase.table("user_deckbox").upsert(
+            {"user_name": user_name, "cards": cards},
+            on_conflict=["user_name"]
+        ).execute()
+        if getattr(res, "error", None):
+            logging.warning(f"Upsert gaf error: {res.error}")
+        return True
     except Exception as e:
-        st.warning(f"Supabase niet bereikbaar, fallback lokaal JSON: {e}")
-        json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}_deckbox.json")
-        with open(json_file, "w", encoding="utf-8") as f:
-            json.dump(deck_box, f, ensure_ascii=False, indent=2)
+        logging.exception(f"Kon deckbox niet opslaan voor {user_name}: {e}")
+        return False
 
-def load_user_deckbox():
-    """Laad de Deck-Box van een gebruiker uit Supabase of lokaal JSON."""
-    user_name = get_user_deck_key()
+def load_user_deckbox_cards(user_name: str) -> list:
+    """Laad deck-box kaarten uit Supabase. Robuuste handling van '204 Missing response'."""
+    if not user_name or user_name.lower() == "guest":
+        return []
+
     try:
-        response = supabase.table("user_deckboxes").select("deck_box").eq("user_name", user_name).maybe_single().execute()
-        if response and response.data and "deck_box" in response.data:
-            st.session_state["deck_box"] = response.data["deck_box"]
-        else:
-            json_file = os.path.join(LOCAL_DATA_DIR, f"{user_name}_deckbox.json")
-            if os.path.exists(json_file):
-                with open(json_file, "r", encoding="utf-8") as f:
-                    st.session_state["deck_box"] = json.load(f)
-            else:
-                st.session_state["deck_box"] = []
+        res = supabase.table("user_deckbox").select("cards").eq("user_name", user_name).maybe_single().execute()
+        if isinstance(res, dict) and res.get("code") in (204, "204"):
+            return []
+        error = getattr(res, "error", None)
+        if isinstance(error, dict) and error.get("code") in (204, "204"):
+            return []
+        data = getattr(res, "data", None)
+        if data:
+            if isinstance(data, dict):
+                return data.get("cards", []) or []
+            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                return data[0].get("cards", []) or []
+        return []
     except Exception as e:
-        st.warning(f"Supabase niet bereikbaar, fallback lokaal JSON: {e}")
-        st.session_state["deck_box"] = []
+        logging.exception(f"Fout bij laden Deck-Box voor {user_name}: {e}")
+        return []
 
 # ------------------ Deck-Box Helper ------------------
 def add_to_deck_box(card):
-    """Voeg kaart toe aan Deck-Box en persistente opslag alleen als username ingevuld is"""
-    if "deck_box" not in st.session_state:
-        st.session_state["deck_box"] = []
-
+    st.session_state.setdefault("deck_box", [])
     user_key = get_user_deck_key()
-    if not user_key:
-        st.warning("Vul eerst je gebruikersnaam in om kaarten op te slaan.")
+    if not user_key or user_key.lower() == "guest":
+        st.warning("Vul eerst een gebruikersnaam in om kaarten op te slaan.")
         return
 
-    if card["name"] not in [c["name"] for c in st.session_state["deck_box"]]:
-        st.session_state["deck_box"].append(card)
-        save_user_decks()
-        cache[user_key + "_cards"] = st.session_state["deck_box"]
-        st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
+    card_key = card.get("id", card.get("name"))
+    existing_keys = [c.get("id", c.get("name")) for c in st.session_state["deck_box"]]
 
+    if card_key not in existing_keys:
+        st.session_state["deck_box"].append(card)
+        save_user_deckbox_cards(user_key, st.session_state["deck_box"])
+        st.toast(f"{card['name']} toegevoegd aan Deck-Box")
+    else:
+        st.info(f"{card.get('name')} staat al in je Deck-Box.")
 
 def remove_from_deck_box(card):
-    """Verwijder kaart uit Deck-Box en update persistente opslag alleen als username ingevuld is"""
-    st.session_state["deck_box"] = [
-        c for c in st.session_state["deck_box"]
-        if c.get("id", c.get("name")) != card.get("id", card.get("name"))
-    ]
-
+    st.session_state.setdefault("deck_box", [])
     user_key = get_user_deck_key()
-    if not user_key:
-        st.warning("Vul eerst je gebruikersnaam in om kaarten op te slaan.")
+    if not user_key or user_key.lower() == "guest":
+        st.warning("Vul eerst een gebruikersnaam in om kaarten op te slaan.")
         return
 
-    save_user_decks()
-    cache[user_key + "_cards"] = st.session_state["deck_box"]
-    st.toast(f"{card['name']} verwijderd uit Deck-Box ❌")
-
-
-
-# ------------------ User Decks Init ------------------
-if "user_name" in st.session_state and st.session_state["user_name"]:
-    load_user_decks()
-    load_user_deckbox()
+    key_to_remove = card.get("id", card.get("name"))
+    st.session_state["deck_box"] = [
+        c for c in st.session_state["deck_box"]
+        if c.get("id", c.get("name")) != key_to_remove
+    ]
+    save_user_deckbox_cards(user_key, st.session_state["deck_box"])
+    st.toast(f"{card.get('name')} verwijderd uit Deck-Box")
 
 # ------------------ Keyword helpers ------------------
 def get_all_keywords():
@@ -637,24 +720,23 @@ def render_cards_with_add(cards, columns=None, context="default"):
             # Functionele knop
             if context == "deckbox":
                 if st.button("✖", key=button_key, help="Verwijder uit Deck-Box"):
-                    # Verwijder kaart uit session + persistente opslag
                     st.session_state["deck_box"] = [
                         c for c in st.session_state["deck_box"]
                         if c.get("id", c.get("name")) != card.get("id", card.get("name"))
                     ]
-                    save_user_decks()
+                    save_user_deckbox_cards(user_deck_key, st.session_state["deck_box"])
                     cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
                     st.toast(f"{card['name']} verwijderd uit Deck-Box ❌")
                     st.rerun()
             else:
                 if st.button("✚", key=button_key, help="Voeg toe aan Deck-Box"):
-                    # Voeg kaart toe als nog niet aanwezig
                     if card["name"] not in [c["name"] for c in st.session_state["deck_box"]]:
                         st.session_state["deck_box"].append(card)
-                        save_user_decks()
+                        save_user_deckbox_cards(user_deck_key, st.session_state["deck_box"])
                         cache[user_deck_key + "_cards"] = st.session_state["deck_box"]
                         st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
                         st.rerun()
+
 
 # ======================================================================
 # 5 SIDEBAR
@@ -667,15 +749,14 @@ with st.sidebar:
     except:
         st.warning("Logo niet gevonden. Upload '12.png'.")
 
-
 # -----------------------------------------------
-# 5.1 👤MIJN DECKS Expander
+# 5.1 👤 MIJN DECKS Expander
 # -----------------------------------------------
-
 with st.sidebar.expander("👤 Mijn Decks", expanded=True):
     # --- Gebruiker identificeren en onthouden ---
     if "user_name" not in st.session_state:
         st.session_state["user_name"] = ""
+    
     st.session_state["user_name"] = st.text_input(
         "Gebruikersnaam",
         value=st.session_state["user_name"],
@@ -683,52 +764,31 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
         key="user_name_input"
     ).strip()
 
-    # Alleen tonen als er geen gebruikersnaam is ingevuld
-    if not st.session_state["user_name"]:
-        st.info("Vul eerst je gebruikersnaam in om decks te beheren.")
+    user_key = get_user_deck_key()
+
+    # Guest fallback
+    if not user_key or user_key.lower() == "guest":
+        st.info("Vul eerst een gebruikersnaam in om decks te beheren.")
+        st.session_state.setdefault("added_decks", [])
+        st.session_state.setdefault("deck_options", {})
     else:
-        # Zorg dat de map 'data' altijd bestaat
-        os.makedirs("data", exist_ok=True)
-
-        st.caption("Beheer je eigen decks")
-
-        # --- Deck opties initialiseren ---
-        if "deck_options" not in st.session_state:
-            st.session_state["deck_options"] = {}
-
-        # Alleen één keer decks laden en spinner tonen bij eerste keer invullen
-        if not st.session_state.get("decks_loaded", False):
-            user_name = st.session_state["user_name"]
-
-            # Toon mana spinner tijdens laden
-            spinner_ph = show_mana_spinner(f"Je decks worden geladen {user_name}...")
-
-            # Alles wat met laden te maken heeft binnen deze scope
-            try:
-                # Decks van deze gebruiker laden
-                load_user_decks()
-                deck_box_cards = cache.get(get_user_deck_key() + "_cards")
-                if deck_box_cards:
-                    st.session_state["deck_box"] = deck_box_cards
-
-                # Deck opties vullen
-                deck_options = {}
-                for deck_id in st.session_state["added_decks"]:
-                    data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
-                    if data:
-                        deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
-                st.session_state["deck_options"] = deck_options
-
-                # Flag zetten dat decks geladen zijn
-                st.session_state["decks_loaded"] = True
-
-            finally:
-                # Spinner verwijderen pas als alles geladen is
-                spinner_ph.empty()
+        # --- Laad decks van deze gebruiker ---
+        st.session_state.setdefault("added_decks", [])
+        st.session_state.setdefault("deck_options", {})
+        
+        added_decks = load_user_decks()  # vult st.session_state["added_decks"]
+        
+        # Bouw deck_options voor selectbox
+        deck_options = {}
+        for deck_id in st.session_state["added_decks"]:
+            data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
+            if data:
+                deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
+        st.session_state["deck_options"] = deck_options
 
         # --- Nieuw deck toevoegen ---
         new_deck_id = st.text_input(
-            "Import Deck from Archidect",
+            "Import Deck from Archidekt",
             help="Noteer hier de getallenreeks in de URL van je deck op archidekt.com",
             key="import_deck_input"
         )
@@ -738,13 +798,13 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
                 new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
                 if new_deck_id not in st.session_state["added_decks"]:
                     st.session_state["added_decks"].append(new_deck_id)
-                    save_user_decks()  # persistente opslag per gebruiker
+                    save_user_decks()
                 st.session_state["deck_options"][new_deck_name] = new_deck_id
                 st.success(f"Deck '{new_deck_name}' toegevoegd.")
             else:
                 st.error("Ongeldige Archidekt Deck ID.")
 
-        # Deck selecteren
+        # --- Deck selecteren ---
         st.session_state["selected_deck_name"] = st.selectbox(
             "My Decks",
             [""] + list(st.session_state["deck_options"].keys()),
@@ -753,7 +813,7 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
             key="select_deck_box"
         )
 
-        # ------------------ Reset deck state bij geen selectie ------------------
+        # Reset deck state bij geen selectie
         if st.session_state["selected_deck_name"] == "":
             st.session_state.update({
                 'deck_loaded': False,
@@ -771,7 +831,7 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
                 st.session_state['last_loaded_deck'] = st.session_state["selected_deck_name"]
                 load_deck(st.session_state["selected_deck_name"])
 
-        # Opties
+        # --- Opties ---
         st.session_state["show_deck"] = st.checkbox(
             "Show Deck",
             value=st.session_state.get("show_deck", False),
@@ -783,7 +843,7 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
             help="Op zoek naar een andere Commander voor je Deck?"
         )
 
-        # Deck verwijderen
+        # --- Deck verwijderen ---
         reset_checkbox = st.session_state.get("reset_delete_deck_checkbox", False)
         delete_deck_checkbox = st.checkbox(
             "Remove Deck",
@@ -802,7 +862,7 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
                     deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
                     if deck_id_to_remove in st.session_state["added_decks"]:
                         st.session_state["added_decks"].remove(deck_id_to_remove)
-                        save_user_decks()  # persistente opslag
+                        save_user_decks()
                     st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
                     st.session_state["reset_delete_deck_checkbox"] = True
                     st.rerun()
@@ -810,20 +870,6 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
                 if st.button("Nee", key="cancel_delete_selected"):
                     st.session_state["reset_delete_deck_checkbox"] = True
                     st.rerun()
-
-# ------------------ Helper: Multiselect auto-close ------------------
-def close_multiselect_on_select(widget_key: str):
-    st.markdown(f"""
-    <script>
-    const observer = new MutationObserver(() => {{
-        const el = window.parent.document.querySelector('div[data-testid="stMultiSelect"]');
-        if (el) {{
-            el.blur();  // sluit de multiselect direct na een selectie
-        }}
-    }});
-    observer.observe(window.parent.document.body, {{ childList: true, subtree: true }});
-    </script>
-    """, unsafe_allow_html=True)
 
 
 # -----------------------------------------------
@@ -902,6 +948,83 @@ user_changed_input = (
 # Als er een wijziging is, trigger de analyse alsof op de knop is gedrukt
 if user_changed_input and not start_btn:
     start_btn = True
+    
+# -----------------------------------------------
+# 5.1 📦 DECK-BOX expander
+# -----------------------------------------------
+deck_box = st.session_state.get("deck_box", [])
+user_key = get_user_deck_key()
+
+with st.sidebar.expander(f"📦 Deck-Box ({len(deck_box)})", expanded=False):
+    if not user_key or user_key.lower() == "guest":
+        st.info("Vul eerst een gebruikersnaam in om je Deck-Box te beheren.")
+    else:
+        st.session_state.setdefault("deck_box", [])
+        if st.session_state["deck_box"] in (None, []):
+            st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
+
+        deck_box = st.session_state["deck_box"]
+        st.caption(f"{len(deck_box)} kaarten klaar voor export")
+
+        if not deck_box:
+            st.info("Je Deck-Box is nog leeg.")
+
+        # Show / Hide toggle
+        if st.button(
+            "👁️ Show Deck-Box" if not st.session_state.get("show_deckbox", False) else "🙈 Hide Deck-Box",
+            use_container_width=True,
+            key="toggle_deckbox_btn"
+        ):
+            st.session_state["show_deckbox"] = not st.session_state.get("show_deckbox", False)
+            st.rerun()
+
+        # Leeg Deck-Box
+        if st.button("🗑️ Leeg Deck-Box", use_container_width=True, key="empty_deckbox_btn"):
+            st.session_state["deck_box"] = []
+            save_user_deckbox_cards(user_key, [])
+            st.success("Deck-Box is geleegd!")
+            st.rerun()
+
+# ----------------Show Deck-Box-------------------
+if st.session_state.get("show_deckbox", False):
+    deck_box = st.session_state.get("deck_box", [])
+    count = len(deck_box)
+    
+    if st.button("🙈 Hide Deck-Box", key="hide_deckbox_main"):
+        st.session_state["show_deckbox"] = False
+        st.rerun()
+    
+    st.subheader(f"📦 Deck-Box ({count})")
+    
+    col_export, col_list, col_preview = st.columns([1, 1, 2])
+
+    with col_export:
+        df = pd.DataFrame(deck_box)
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        st.download_button("⬇️ Exporteer als CSV", data=csv_bytes, file_name="deckbox.csv", mime="text/csv", use_container_width=True)
+        st.text_area("📋 Kopieer kaartnamen:", value="\n".join(c.get("name","") for c in deck_box), height=100)
+
+    with col_list:
+        names = [c.get("name","") for c in deck_box]
+        selected_name = st.radio("Selecteer een kaart:", options=names, index=0 if names else None)
+        selected_card = next((c for c in deck_box if c.get("name","")==selected_name), None)
+        if selected_card and st.button("✖ Verwijder kaart"):
+            deck_box.remove(selected_card)
+            st.session_state["deck_box"] = deck_box
+            save_user_deckbox_cards(user_key, deck_box)
+            st.rerun()
+
+    with col_preview:
+        if selected_card:
+            img_url = (
+                selected_card.get("image_uris",{}).get("normal")
+                or selected_card.get("card_faces",[{}])[0].get("image_uris",{}).get("normal")
+                or "https://via.placeholder.com/223x310?text=Geen+afbeelding"
+            )
+            st.image(img_url, width=320)
+            st.caption(selected_card.get("name","Onbekend"))
+
+    st.stop()
 
 # -----------------------------------------------
 # 5.3 🖥 WEERGAVE Expander
@@ -1310,127 +1433,6 @@ def render_active_toggle_results():
 # ------------------ Aanroepen ------------------
 sidebar_toggle_expander()
 render_active_toggle_results()
-
-# -----------------------------------------------
-# 5.5 📦 DECK-BOX Expander
-# -----------------------------------------------
-
-# ------------------ Deck-Box Expander ------------------
-def render_deckbox_expander(expanded: bool = False):
-    import pandas as pd
-    import streamlit as st
-
-    st.session_state.setdefault("deck_box", [])
-    st.session_state.setdefault("show_deckbox", False)
-
-    # Controleer of username ingevuld is
-    user_key = get_user_deck_key()
-    if not user_key:
-        st.sidebar.info("Vul eerst je gebruikersnaam in om je Deck-Box te gebruiken.")
-        return
-
-    # Load persistente kaarten
-    cached_cards = cache.get(user_key + "_cards")
-    if cached_cards is not None:
-        st.session_state["deck_box"] = cached_cards
-    else:
-        load_user_decks()
-        cache[user_key + "_cards"] = st.session_state.get("deck_box", [])
-
-    deck_box = st.session_state["deck_box"]
-    count = len(deck_box)
-    title = f"📦 Deck-Box ({count})"
-
-    # ---------------- Sidebar Expander ----------------
-    with st.sidebar.expander(title, expanded=expanded):
-        st.caption("Bekijk en Exporteer je geselecteerde kaarten")
-        if not deck_box:
-            st.info("Je Deck-Box is nog leeg.")
-
-        # Sidebar toggle show/hide
-        if st.button(
-            "👁️ Show Deck-Box" if not st.session_state["show_deckbox"] else "🙈 Hide Deck-Box",
-            use_container_width=True,
-            key="toggle_deckbox_btn"
-        ):
-            st.session_state["show_deckbox"] = not st.session_state["show_deckbox"]
-            st.rerun()
-
-        # Knop om volledige Deck-Box leeg te maken
-        if st.button("🗑️ Leeg Deck-Box", use_container_width=True, key="empty_deckbox_btn"):
-            st.session_state["deck_box"] = []
-            save_user_decks()
-            cache[user_key + "_cards"] = []
-            st.success("Deck-Box is geleegd!")
-            st.rerun()
-
-    # ---------------- Hoofdscherm ----------------
-    if st.session_state["show_deckbox"]:
-        st.subheader("📦 Jouw Deck-Box")
-
-        # Subtiele Hide-knop
-        if st.button("🙈 Hide Deck-Box", key="hide_deckbox_main"):
-            st.session_state["show_deckbox"] = False
-            st.rerun()
-
-        if not deck_box:
-            st.info("Je Deck-Box is nog leeg.")
-            st.stop()
-
-        # ---------------- 3 Kolommen: Export | Kaartenlijst | Preview ----------------
-        col_export, col_list, col_preview = st.columns([1, 1, 2])
-
-        # ---------------- Kolom 1: Export ----------------
-        with col_export:
-            st.subheader("Export")
-            card_names = "\n".join([c.get("name", "") for c in deck_box])
-            st.text_area("📋 Kopieer kaartnamen:", value=card_names, height=100, key="deckbox_copy_area")
-
-            df = pd.DataFrame(deck_box)
-            csv_bytes = df.to_csv(index=False).encode("utf-8")
-            st.download_button(
-                label="⬇️ Exporteer als CSV",
-                data=csv_bytes,
-                file_name="deckbox.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-
-        # ---------------- Kolom 2: Kaartenlijst met radiobutton ----------------
-        with col_list:
-            st.subheader("Kaartenlijst")
-            names = [c.get("name", "") for c in deck_box]
-            selected_name = st.radio("Selecteer een kaart:", options=names, index=0 if names else None, key="deckbox_radio")
-
-            selected_card = None
-            if selected_name:
-                selected_card = next((c for c in deck_box if c.get("name", "") == selected_name), None)
-
-                # Remove knop
-                remove_key = f"deckbox_remove_{selected_card.get('id', selected_card.get('name'))}"
-                if st.button("✖ Verwijder kaart", key=remove_key):
-                    deck_box.remove(selected_card)
-                    save_user_decks()
-                    cache[user_key + "_cards"] = deck_box
-                    st.rerun()
-
-        # ---------------- Kolom 3: Preview geselecteerde kaart ----------------
-        with col_preview:
-            st.subheader("Preview")
-            if selected_card:
-                img_url = (
-                    selected_card.get("image_uris", {}).get("normal")
-                    or selected_card.get("card_faces", [{}])[0].get("image_uris", {}).get("normal")
-                    or "https://via.placeholder.com/223x310?text=Geen+afbeelding"
-                )
-                st.image(img_url, width=320)
-                st.caption(selected_card.get("name", "Onbekend"))
-
-        # ---------------- Stop rest van app render ----------------
-        st.stop()
-
-# ---------------- Call de functie ----------------
-render_deckbox_expander(expanded=False)
 
 # -----------------------------------------------
 # 5.6 ❓README knop
