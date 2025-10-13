@@ -748,13 +748,15 @@ with st.sidebar.expander("👤 Mijn Decks", expanded=True):
                 st.error("Ongeldige Archidekt Deck ID.")
 
         # --- Deck selecteren ---
+        deck_count = len(st.session_state.get("deck_options", {}))
         st.session_state["selected_deck_name"] = st.selectbox(
-            "My Decks",
+            f"My {deck_count} Decks",
             [""] + list(st.session_state["deck_options"].keys()),
             index=0,
             help="Selecteer een deck | Geen deck geselecteerd = alle kaarten",
             key="select_deck_box"
         )
+
 
         # Reset deck state bij geen selectie
         if st.session_state["selected_deck_name"] == "":
@@ -895,10 +897,18 @@ if user_changed_input and not start_btn:
 # -----------------------------------------------
 # 5.1 📦 DECK-BOX expander
 # -----------------------------------------------
-deck_box = st.session_state.get("deck_box", [])
 user_key = get_user_deck_key()
+st.session_state.setdefault("deck_box", [])
 
-with st.sidebar.expander(f"📦 Deck-Box ({len(deck_box)})", expanded=False):
+# ✅ Deck-Box altijd eerst laden vóór de expander
+if user_key and user_key.lower() != "guest":
+    if not st.session_state["deck_box"]:
+        st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
+
+deck_box = st.session_state["deck_box"]
+deck_box_count = len(deck_box)
+
+with st.sidebar.expander(f"📦 Deck-Box ({deck_box_count})", expanded=False):
     if not user_key or user_key.lower() == "guest":
         st.info("Vul eerst een gebruikersnaam in om je Deck-Box te beheren.")
     else:
@@ -1205,9 +1215,8 @@ def render_active_toggle_results():
 
             # ---- Scryfall API integratie ----
             try:
-                r = requests.get("https://api.scryfall.com/sets")
-                r.raise_for_status()
-                all_sets = r.json().get("data", [])
+                sets_data = safe_api_call("https://api.scryfall.com/sets")
+                all_sets = sets_data.get("data", []) if sets_data else []
                 upcoming_releases = []
                 for s in all_sets:
                     release_str = s.get("released_at")
@@ -1228,6 +1237,7 @@ def render_active_toggle_results():
                 upcoming_releases = []
                 st.error(f"Fout bij ophalen van releases: {e}")
 
+            # Spinner weg na releases
             spinner_ph.empty()
 
             if upcoming_releases:
@@ -1253,7 +1263,7 @@ def render_active_toggle_results():
 
         # ---------------- Onder: Kaarten ----------------
         st.subheader("Card Previews")
-        spinner_ph = show_mana_spinner("Back to the Future...")
+        spinner_ph = show_mana_spinner("Fetching Cards...")
 
         # --- Haal alle toekomstige sets op ---
         cache_key_sets = f"upcoming_sets_{today}"
@@ -1287,6 +1297,7 @@ def render_active_toggle_results():
                 cache.set(cache_key_cards, cards_in_set, expire=60*60*24)
             future_cards.extend(cards_in_set)
 
+        # Spinner weg na kaarten laden
         spinner_ph.empty()
 
         if not future_cards:
@@ -1296,8 +1307,7 @@ def render_active_toggle_results():
         # --- Tijdelijke melding ---
         info_ph = st.empty()
         info_ph.info(f"{len(future_cards)} kaarten gevonden in {len(upcoming_sets)} komende set(s)")
-        import time
-        time.sleep(3)
+        time.sleep(2)
         info_ph.empty()
 
         # --- Filter op set (optioneel) ---
@@ -1309,7 +1319,7 @@ def render_active_toggle_results():
         if selected_sets:
             selected_codes = [s.split(" - ")[0] for s in selected_sets]
             future_cards = [c for c in future_cards if c.get("set", "").upper() in selected_codes]
-        
+
         sort_option = st.session_state.get("sort_option", "Releasedatum Nieuw-Oud")
         future_cards = sort_cards(future_cards, sort_option)
 
