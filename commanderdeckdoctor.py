@@ -227,6 +227,13 @@ div[data-testid="stVerticalBlock"] {
     align-items: start;
     width: 100%;
 }
+@media (max-width: 1024px) {
+    .card-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+}
+@media (max-width: 768px) {
+    .card-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .card-name { font-size: 12px; }
+}
 
 /* ---------------- Individuele kaart-container ---------------- */
 .card-hover-container {
@@ -982,9 +989,8 @@ if st.session_state.get("show_deckbox", False):
 # -----------------------------------------------
 # 5.3 🖥 WEERGAVE Expander
 # -----------------------------------------------
-
 with st.sidebar.expander("🖥️ Weergave", expanded=False):
-    # Kaarten per rij
+    # ---------------- Kaarten per rij ----------------
     st.session_state.setdefault("cards_per_row", 6)
     st.session_state["cards_per_row"] = st.slider(
         "Kaarten per rij",
@@ -995,21 +1001,46 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
         help="Kies hoeveel kaarten je naast elkaar wilt zien in de resultaten"
     )
 
-    # Sorteeropties
+    # ---------------- Sorteeropties ----------------
     sort_options = ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
                     "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
-
-
-    # Default sortering instellen bij eerste load
     st.session_state.setdefault("sort_option", "Releasedatum Nieuw-Oud")
-
-    # Selectbox aanmaken
     st.session_state["sort_option"] = st.selectbox(
         "Sort Results:",
         sort_options,
         index=sort_options.index(st.session_state["sort_option"])
     )
 
+    # ---------------- Dark / Light Mode ----------------
+    mode = st.radio(
+        "Theme Mode",
+        ["Dark", "Light"],
+        index=0 if st.session_state.get("theme_mode", "Dark") == "Dark" else 1,
+        key="theme_mode_radio"
+    )
+    st.session_state["theme_mode"] = mode
+
+    # Pas CSS aan op basis van keuze
+    if st.session_state["theme_mode"] == "Light":
+        st.markdown("""
+        <style>
+        .stApp {
+            background: #f5f5f5;
+            color: #1a1a1a;
+        }
+        .card-name { color: #1a1a1a; }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #150f30, #001900);
+            color: white;
+        }
+        .card-name { color: white; }
+        </style>
+        """, unsafe_allow_html=True)
 
 # -----------------------------------------------
 # 5.4 ❤️ GOOD STUFF Expander
@@ -1755,7 +1786,7 @@ if start_btn:
         base_query += f" year>={current_year-3}"
 
     # Spinner tonen tijdens ophalen
-    spinner_ph = show_mana_spinner("Tütoring results…")
+    spinner_ph = show_mana_spinner("Fetching results…")
     results = scryfall_search_all_limited(base_query, max_cards=5000)
 
     # ------------------ Strikte lokale CI-filter ------------------
