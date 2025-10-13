@@ -702,11 +702,19 @@ with st.sidebar:
 # -----------------------------------------------
 # 5.1 👤 MIJN DECKS Expander
 # -----------------------------------------------
-with st.sidebar.expander("👤 Mijn Decks", expanded=True):
-    # --- Gebruiker identificeren en onthouden ---
-    if "user_name" not in st.session_state:
-        st.session_state["user_name"] = ""
-    
+# --- Gebruiker identificeren en onthouden ---
+if "user_name" not in st.session_state:
+    st.session_state["user_name"] = ""
+
+# Bepaal titel dynamisch (voor we de expander openen)
+expander_title = (
+    f"👤 {st.session_state['user_name']}'s Decks"
+    if st.session_state["user_name"]
+    else "👤 Mijn Decks"
+)
+
+# Expander met dynamische titel
+with st.sidebar.expander(expander_title, expanded=True):
     st.session_state["user_name"] = st.text_input(
         "Gebruikersnaam",
         value=st.session_state["user_name"],
@@ -1010,38 +1018,6 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
         sort_options,
         index=sort_options.index(st.session_state["sort_option"])
     )
-
-    # ---------------- Dark / Light Mode ----------------
-    mode = st.radio(
-        "Theme Mode",
-        ["Dark", "Light"],
-        index=0 if st.session_state.get("theme_mode", "Dark") == "Dark" else 1,
-        key="theme_mode_radio"
-    )
-    st.session_state["theme_mode"] = mode
-
-    # Pas CSS aan op basis van keuze
-    if st.session_state["theme_mode"] == "Light":
-        st.markdown("""
-        <style>
-        .stApp {
-            background: #f5f5f5;
-            color: #1a1a1a;
-        }
-        .card-name { color: #1a1a1a; }
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <style>
-        .stApp {
-            background: linear-gradient(135deg, #150f30, #001900);
-            color: white;
-        }
-        .card-name { color: white; }
-        </style>
-        """, unsafe_allow_html=True)
-
 # -----------------------------------------------
 # 5.4 ❤️ GOOD STUFF Expander
 # -----------------------------------------------
