@@ -1,22 +1,42 @@
 # ======================================================================
-# 1. IMPORTS
+# 1. IMPORTS 
 # ======================================================================
-import streamlit as st
-import requests
-import time
-from PIL import Image
-import datetime
-from urllib.parse import quote_plus
-import diskcache
-import json
-import re
 import os
-import tempfile
-import logging
 import io
-from datetime import datetime, timedelta
-from supabase import create_client, Client
+import json
+import time
+import logging
+import tempfile
+from pathlib import Path
+
+# Streamlit
+import streamlit as st
+
+# Data & API
+import requests
 import pandas as pd
+from PIL import Image
+
+# Caching
+import diskcache
+
+# Supabase
+from supabase import create_client, Client
+
+# Datetime (inclusief timezone voor KETCH-UP)
+from datetime import datetime, date, timedelta, timezone
+
+# URL encoding
+from urllib.parse import quote_plus
+
+
+# ======================================================================
+# Logging setup
+# ======================================================================
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # ======================================================================
 # 2. CONFIG
