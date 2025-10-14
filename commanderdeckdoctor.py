@@ -17,7 +17,6 @@ import io
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 import pandas as pd
-from streamlit_js_eval import streamlit_js_eval
 
 # ======================================================================
 # 2. CONFIG
@@ -665,26 +664,19 @@ def render_cards_with_add(cards, columns=None, context="default"):
                         st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
                         st.rerun()
 
-# ------------------ Detecteer schermbreedte en stel cards_per_row in ------------------
-from streamlit_js_eval import streamlit_js_eval
+# ---------------- Detecteer schermbreedte (Cloud-veilig) ----------------
+# Streamlit Cloud ondersteunt geen native JS, dus we gebruiken een fallback
+DEFAULT_SCREEN_WIDTH = 1024  # kies een redelijke standaard
 
-try:
-    screen_width = streamlit_js_eval(js_expressions="window.innerWidth")
-except Exception as e:
-    screen_width = None
-    print(f"screen_width detectie faalde: {e}")
-
-# Zorg dat we altijd een valide int hebben
-if not isinstance(screen_width, (int, float)) or screen_width is None:
-    screen_width = 1024  # fallback waarde
-
-st.session_state["screen_width"] = screen_width
+# Session state instellen als nog niet aanwezig
+if "screen_width" not in st.session_state:
+    st.session_state["screen_width"] = DEFAULT_SCREEN_WIDTH
 
 # Dynamische default voor kaarten per rij, alleen instellen als slider nog niet in session_state
 if "cards_per_row" not in st.session_state:
-    if screen_width >= 1400:
+    if st.session_state["screen_width"] >= 1400:
         st.session_state["cards_per_row"] = 6
-    elif screen_width >= 1024:
+    elif st.session_state["screen_width"] >= 1024:
         st.session_state["cards_per_row"] = 4
     else:
         st.session_state["cards_per_row"] = 3
