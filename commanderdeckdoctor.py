@@ -8,18 +8,16 @@ from PIL import Image
 import datetime
 from urllib.parse import quote_plus
 import diskcache
-import re
 import json
+import re
 import os
-import hashlib
-import uuid
 import tempfile
 import logging
 import io
 from datetime import datetime, timedelta
-from datetime import date
 from supabase import create_client, Client
 import pandas as pd
+from streamlit_js_eval import streamlit_js_eval
 
 # ======================================================================
 # 2. CONFIG
@@ -40,10 +38,6 @@ logging.basicConfig(
 # ------------------ User & Deck Data Helpers ------------------
 LOCAL_DATA_DIR = "data"
 os.makedirs(LOCAL_DATA_DIR, exist_ok=True)
-
-# ------------------ DiskCache Init ------------------
-cache_dir = tempfile.mkdtemp()
-cache = diskcache.Cache(cache_dir)
 
 # ---------------- Session state defaults ------------------
 for key, default in {
@@ -400,13 +394,6 @@ def show_mana_spinner(message="Bezig met laden..."):
     ph.markdown(html, unsafe_allow_html=True)
     return ph
 
-# ------------------ Color Identity helpers ------------------
-WUBRG_ORDER = "WUBRG"
-
-def order_colors_wubrg(colors_set):
-    order = {c: i for i, c in enumerate(WUBRG_ORDER)}
-    return "".join(sorted(list(colors_set), key=lambda c: order.get(c, 99)))
-
 # ------------------ Sort Cards helpers ------------------
 def sort_cards(cards, sort_option):
     if not cards or sort_option == "Geen":
@@ -489,16 +476,7 @@ def get_user_deck_key():
 # Initialize user_key vroeg in de sessie
 user_key = get_user_deck_key()
 
-# ------------------ Init: Gebruiker & Data ------------------
-if not user_key or user_key.lower() == "guest":
-    st.session_state.setdefault("added_decks", [])
-    st.session_state.setdefault("deck_box", [])
-else:
-    if "added_decks" not in st.session_state or st.session_state["added_decks"] is None:
-        st.session_state["added_decks"] = load_user_decks()
-    if "deck_box" not in st.session_state or st.session_state["deck_box"] is None:
-        st.session_state["deck_box"] = load_user_deckbox_cards(user_key)
-        
+      
 # ------------------ User Decks ------------------
 def save_user_decks():
     """Sla decks op in Supabase. Fallback naar lokaal JSON als insert/update faalt."""
@@ -687,6 +665,29 @@ def render_cards_with_add(cards, columns=None, context="default"):
                         st.toast(f"{card['name']} toegevoegd aan Deck-Box 💥")
                         st.rerun()
 
+# ------------------ Detecteer schermbreedte en stel cards_per_row in ------------------
+from streamlit_js_eval import streamlit_js_eval
+
+try:
+    screen_width = streamlit_js_eval(js_expressions="window.innerWidth")
+except Exception as e:
+    screen_width = None
+    print(f"screen_width detectie faalde: {e}")
+
+# Zorg dat we altijd een valide int hebben
+if not isinstance(screen_width, (int, float)) or screen_width is None:
+    screen_width = 1024  # fallback waarde
+
+st.session_state["screen_width"] = screen_width
+
+# Dynamische default voor kaarten per rij, alleen instellen als slider nog niet in session_state
+if "cards_per_row" not in st.session_state:
+    if screen_width >= 1400:
+        st.session_state["cards_per_row"] = 6
+    elif screen_width >= 1024:
+        st.session_state["cards_per_row"] = 4
+    else:
+        st.session_state["cards_per_row"] = 3
 
 # ======================================================================
 # 5 SIDEBAR
@@ -706,131 +707,133 @@ with st.sidebar:
 if "user_name" not in st.session_state:
     st.session_state["user_name"] = ""
 
-# Bepaal titel dynamisch (voor we de expander openen)
+# --- Bepaal titel dynamisch ---
 expander_title = (
     f"👤 {st.session_state['user_name']}'s Decks"
     if st.session_state["user_name"]
     else "👤 Mijn Decks"
 )
 
-# Expander met dynamische titel
+# --- Expander ---
 with st.sidebar.expander(expander_title, expanded=True):
-    st.session_state["user_name"] = st.text_input(
-        "Gebruikersnaam",
-        value=st.session_state["user_name"],
-        help="Hoofdlettergevoelige naam, iedere sessie gebruiken om decks op te slaan en op te halen.",
-        key="user_name_input"
-    ).strip()
+    # Toon invulveld alleen als er nog geen naam is
+    if not st.session_state["user_name"]:
+        new_user_name = st.text_input(
+            "Gebruikersnaam",
+            value="",
+            help="Hoofdlettergevoelige naam, iedere sessie gebruiken om decks op te slaan en op te halen.",
+            key="user_name_input"
+        ).strip()
 
-    user_key = get_user_deck_key()
+        if new_user_name:
+            st.session_state["user_name"] = new_user_name
 
-    # Guest fallback
-    if not user_key or user_key.lower() == "guest":
-        st.info("Vul eerst een gebruikersnaam in om decks te beheren.")
-        st.session_state.setdefault("added_decks", [])
-        st.session_state.setdefault("deck_options", {})
-    else:
-        # --- Laad decks van deze gebruiker ---
-        st.session_state.setdefault("added_decks", [])
-        st.session_state.setdefault("deck_options", {})
-        
-        added_decks = load_user_decks()  # vult st.session_state["added_decks"]
-        
-        # Bouw deck_options voor selectbox
-        deck_options = {}
-        for deck_id in st.session_state["added_decks"]:
-            data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
-            if data:
-                deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
-        st.session_state["deck_options"] = deck_options
+    # --- Content van de expander pas tonen als er een naam is ---
+    if st.session_state["user_name"]:
+        user_key = get_user_deck_key()
 
-        # --- Nieuw deck toevoegen ---
-        new_deck_id = st.text_input(
-            "Import Deck from Archidekt",
-            help="Noteer hier de getallenreeks in de URL van je deck op archidekt.com",
-            key="import_deck_input"
-        )
-        if new_deck_id:
-            new_data = safe_api_call(f"https://archidekt.com/api/decks/{new_deck_id}/")
-            if new_data:
-                new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
-                if new_deck_id not in st.session_state["added_decks"]:
-                    st.session_state["added_decks"].append(new_deck_id)
-                    save_user_decks()
-                st.session_state["deck_options"][new_deck_name] = new_deck_id
-                st.success(f"Deck '{new_deck_name}' toegevoegd.")
-            else:
-                st.error("Ongeldige Archidekt Deck ID.")
-
-        # --- Deck selecteren ---
-        deck_count = len(st.session_state.get("deck_options", {}))
-        st.session_state["selected_deck_name"] = st.selectbox(
-            f"My {deck_count} Decks",
-            [""] + list(st.session_state["deck_options"].keys()),
-            index=0,
-            help="Selecteer een deck | Geen deck geselecteerd = alle kaarten",
-            key="select_deck_box"
-        )
-
-
-        # Reset deck state bij geen selectie
-        if st.session_state["selected_deck_name"] == "":
-            st.session_state.update({
-                'deck_loaded': False,
-                'cards': [],
-                'deck_card_names': set(),
-                'full_deck': [],
-                'commanders': [],
-                'color_identity': set(),
-                'commander_types': set(),
-                'last_loaded_deck': ""
-            })
+        # Guest fallback
+        if not user_key or user_key.lower() == "guest":
+            st.info("Vul eerst een gebruikersnaam in om decks te beheren.")
+            st.session_state.setdefault("added_decks", [])
+            st.session_state.setdefault("deck_options", {})
         else:
-            # Alleen load_deck aanroepen als functie gedefinieerd is en deck verandert
-            if "load_deck" in globals() and st.session_state["selected_deck_name"] != st.session_state.get('last_loaded_deck', ''):
-                st.session_state['last_loaded_deck'] = st.session_state["selected_deck_name"]
-                load_deck(st.session_state["selected_deck_name"])
+            st.session_state.setdefault("added_decks", [])
+            st.session_state.setdefault("deck_options", {})
+            
+            added_decks = load_user_decks()  # vult st.session_state["added_decks"]
+            
+            # Bouw deck_options voor selectbox
+            deck_options = {}
+            for deck_id in st.session_state["added_decks"]:
+                data = safe_api_call(f"https://archidekt.com/api/decks/{deck_id}/")
+                if data:
+                    deck_options[data.get("name", f"Deck {deck_id}")] = deck_id
+            st.session_state["deck_options"] = deck_options
 
-        # --- Opties ---
-        st.session_state["show_deck"] = st.checkbox(
-            "Show Deck",
-            value=st.session_state.get("show_deck", False),
-            help="Toont alle kaarten in je deck"
-        )
-        st.session_state["alt_commander_toggle"] = st.checkbox(
-            "Alternative Commanders",
-            value=st.session_state.get("alt_commander_toggle", False),
-            help="Op zoek naar een andere Commander voor je Deck?"
-        )
-
-        # --- Deck verwijderen ---
-        reset_checkbox = st.session_state.get("reset_delete_deck_checkbox", False)
-        delete_deck_checkbox = st.checkbox(
-            "Remove Deck",
-            value=False if reset_checkbox else st.session_state.get("delete_deck_checkbox", False),
-            key="delete_deck_checkbox",
-            help="Verwijder het geselecteerde deck uit deze lijst"
-        )
-        if reset_checkbox:
-            st.session_state["reset_delete_deck_checkbox"] = False
-
-        if delete_deck_checkbox and st.session_state["selected_deck_name"]:
-            st.warning(f"Weet je zeker dat je '{st.session_state['selected_deck_name']}' wilt verwijderen?")
-            col_confirm1, col_confirm2 = st.columns(2)
-            with col_confirm1:
-                if st.button("Ja", key="confirm_delete_selected"):
-                    deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
-                    if deck_id_to_remove in st.session_state["added_decks"]:
-                        st.session_state["added_decks"].remove(deck_id_to_remove)
+            # --- Nieuw deck toevoegen ---
+            new_deck_id = st.text_input(
+                "Import Deck from Archidekt",
+                help="Noteer hier de getallenreeks in de URL van je deck op archidekt.com",
+                key="import_deck_input"
+            )
+            if new_deck_id:
+                new_data = safe_api_call(f"https://archidekt.com/api/decks/{new_deck_id}/")
+                if new_data:
+                    new_deck_name = new_data.get("name", f"Deck {new_deck_id}")
+                    if new_deck_id not in st.session_state["added_decks"]:
+                        st.session_state["added_decks"].append(new_deck_id)
                         save_user_decks()
-                    st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
-                    st.session_state["reset_delete_deck_checkbox"] = True
-                    st.rerun()
-            with col_confirm2:
-                if st.button("Nee", key="cancel_delete_selected"):
-                    st.session_state["reset_delete_deck_checkbox"] = True
-                    st.rerun()
+                    st.session_state["deck_options"][new_deck_name] = new_deck_id
+                    st.success(f"Deck '{new_deck_name}' toegevoegd.")
+                else:
+                    st.error("Ongeldige Archidekt Deck ID.")
 
+            # --- Deck selecteren ---
+            deck_count = len(st.session_state.get("deck_options", {}))
+            st.session_state["selected_deck_name"] = st.selectbox(
+                f"My {deck_count} Decks",
+                [""] + list(st.session_state["deck_options"].keys()),
+                index=0,
+                help="Selecteer een deck | Geen deck geselecteerd = alle kaarten",
+                key="select_deck_box"
+            )
+
+            # Reset deck state bij geen selectie
+            if st.session_state["selected_deck_name"] == "":
+                st.session_state.update({
+                    'deck_loaded': False,
+                    'cards': [],
+                    'deck_card_names': set(),
+                    'full_deck': [],
+                    'commanders': [],
+                    'color_identity': set(),
+                    'commander_types': set(),
+                    'last_loaded_deck': ""
+                })
+            else:
+                # Alleen load_deck aanroepen als functie gedefinieerd is en deck verandert
+                if "load_deck" in globals() and st.session_state["selected_deck_name"] != st.session_state.get('last_loaded_deck', ''):
+                    st.session_state['last_loaded_deck'] = st.session_state["selected_deck_name"]
+                    load_deck(st.session_state["selected_deck_name"])
+
+            # --- Opties ---
+            st.session_state["show_deck"] = st.checkbox(
+                "Show Deck",
+                value=st.session_state.get("show_deck", False),
+                help="Toont alle kaarten in je deck"
+            )
+            st.session_state["alt_commander_toggle"] = st.checkbox(
+                "Alternative Commanders",
+                value=st.session_state.get("alt_commander_toggle", False),
+                help="Op zoek naar een andere Commander voor je Deck?"
+            )
+
+            # --- Deck verwijderen ---
+            reset_checkbox = st.session_state.get("reset_delete_deck_checkbox", False)
+            delete_deck_checkbox = st.checkbox(
+                "Remove Deck",
+                value=False if reset_checkbox else st.session_state.get("delete_deck_checkbox", False),
+                key="delete_deck_checkbox",
+                help="Verwijder het geselecteerde deck uit deze lijst"
+            )
+            if reset_checkbox:
+                st.session_state["reset_delete_deck_checkbox"] = False
+
+            if delete_deck_checkbox and st.session_state["selected_deck_name"]:
+                st.warning(f"Weet je zeker dat je '{st.session_state['selected_deck_name']}' wilt verwijderen?")
+                col_confirm1, col_confirm2 = st.columns(2)
+                with col_confirm1:
+                    if st.button("Ja", key="confirm_delete_selected"):
+                        deck_id_to_remove = st.session_state["deck_options"].get(st.session_state["selected_deck_name"])
+                        if deck_id_to_remove in st.session_state["added_decks"]:
+                            st.session_state["added_decks"].remove(deck_id_to_remove)
+                            save_user_decks()
+                        st.success(f"Deck '{st.session_state['selected_deck_name']}' is verwijderd.")
+                        st.session_state["reset_delete_deck_checkbox"] = True
+                with col_confirm2:
+                    if st.button("Nee", key="cancel_delete_selected"):
+                        st.session_state["reset_delete_deck_checkbox"] = True
 
 # -----------------------------------------------
 # 5.2 🔍 ZOEK & VIND Expander
@@ -998,17 +1001,15 @@ if st.session_state.get("show_deckbox", False):
 # 5.3 🖥 WEERGAVE Expander
 # -----------------------------------------------
 with st.sidebar.expander("🖥️ Weergave", expanded=False):
-    # ---------------- Kaarten per rij ----------------
-    st.session_state.setdefault("cards_per_row", 6)
+    # ------------------ Slider in Weergave-expander ------------------
     st.session_state["cards_per_row"] = st.slider(
         "Kaarten per rij",
         min_value=1,
         max_value=9,
-        value=st.session_state["cards_per_row"],
+        value=st.session_state.get("cards_per_row", 6),
         step=1,
         help="Kies hoeveel kaarten je naast elkaar wilt zien in de resultaten"
     )
-
     # ---------------- Sorteeropties ----------------
     sort_options = ["Geen", "Naam A-Z", "Naam Z-A", "Mana Value Laag-Hoog",
                     "Mana Value Hoog-Laag", "Releasedatum Oud-Nieuw", "Releasedatum Nieuw-Oud"]
@@ -1200,8 +1201,6 @@ def render_active_toggle_results():
 
     # -------- 🍅 KETCH-UP Toggle --------
     elif st.session_state.get("ketchup_active", False):
-        from PIL import Image
-        from datetime import datetime, date, timezone
 
         today = date.today().isoformat()
 
@@ -1352,7 +1351,6 @@ def render_active_toggle_results():
     # -------- ⭐ SHERIFF Toggle --------
     elif st.session_state.get("sheriff_active", False):
         from pathlib import Path
-        from PIL import Image
 
         try:
             # Pad relatief aan het script
