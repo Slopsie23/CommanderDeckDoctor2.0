@@ -1037,75 +1037,177 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
 # -----------------------------------------------
 
 def sidebar_toggle_expander():
-    """Good Stuff toggles in sidebar met oog-indicatie (fade-in & glow één keer)"""
+    """Good Stuff toggles in sidebar met label, helper-icon en compacte layout"""
 
     # Session state defaults
     for key in ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]:
         st.session_state.setdefault(key, False)
 
+    # --- CSS ---
     st.markdown("""
     <style>
-    .toggle-button-wrapper .stButton > button { 
-        width: 60px !important; height: 60px !important; border-radius: 12px !important;
-        font-size: 40px !important; font-weight: bold !important; cursor: pointer !important;
-        border: none !important; margin: 4px; background: linear-gradient(to right, #111127, #011901) !important;
-        color: white !important; box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
-        position: relative; transition: all 0.2s ease-in-out;
+    .goodstuff-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        align-items: center;
+        justify-content: flex-start;
     }
-    .toggle-button-wrapper .stButton > button:hover {
+
+    .goodstuff-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 2px 0;
+        flex: 1 1 45%;
+        min-width: 140px;
+    }
+
+    /* Knoppen */
+    .goodstuff-item .stButton > button { 
+        width: 44px !important; 
+        height: 44px !important; 
+        border-radius: 8px !important;
+        font-size: 26px !important; 
+        font-weight: bold !important;
+        border: none !important;
+        background: linear-gradient(to right, #111127, #011901) !important;
+        color: white !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
+        transition: all 0.2s ease-in-out;
+        padding: 0 !important;
+    }
+
+    .goodstuff-item .stButton > button:hover {
         transform: scale(1.1);
-        box-shadow: 0 0 12px rgba(0,255,0,0.5), 0 4px 6px rgba(0,0,0,0.5);
+        box-shadow: 0 0 10px rgba(0,255,0,0.5);
         background: linear-gradient(to right, #1a1a1a, #002200) !important;
     }
-    .eye-glow {
-        font-size: 22px;
-        color: #00ff00;
-        text-align: center;
-        opacity: 0;
-        animation: eyeFadeGlow 1s ease-in-out forwards; /* één keer uitvoeren en blijven staan */
+
+    /* Labels */
+    .goodstuff-label {
+        font-size: 14px;
+        color: #ddd;
+        white-space: nowrap;
+        transition: color 0.25s ease-in-out, text-shadow 0.25s ease-in-out;
     }
-    @keyframes eyeFadeGlow {
-        0% { opacity: 0; text-shadow: 0 0 2px #00ff00; }
-        50% { opacity: 1; text-shadow: 0 0 12px #00ff00, 0 0 20px #00ff00; }
-        100% { opacity: 1; text-shadow: 0 0 8px #00ff00, 0 0 16px #00ff00; }
+
+    /* Actieve glow */
+    .goodstuff-label.active {
+        color: #00ff00;
+        text-shadow: 0 0 4px #00ff00, 0 0 8px #00ff00, 0 0 12px #00ff00;
+        font-weight: 600;
+    }
+
+    /* Help-icoon */
+    .goodstuff-help {
+        font-size: 14px;
+        color: #888;
+        margin-left: 6px;
+        cursor: help;
+        display: inline-block;
+        transition: color 0.2s ease-in-out;
+    }
+    .goodstuff-help:hover {
+        color: #00ff00;
+        text-shadow: 0 0 4px #00ff00;
+    }
+
+    /* Tooltip */
+    .tooltip {
+        position: relative;
+        display: inline-flex;
+        align-items: left;
+        justify-content: left;
+    }
+
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        opacity: 0;
+        background-color: rgba(15, 15, 15, 0.95);
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 6px 10px;
+        position: absolute;
+        bottom: 130%;
+        left: 50%;
+        transform: translateX(-50%);
+        transition: opacity 0.25s ease-in-out;
+        font-size: 12px;
+        line-height: 1.3em;
+        width: auto;
+        max-width: 240px;
+        white-space: nowrap;
+        box-shadow: 0 0 8px rgba(0,255,0,0.4);
+    }
+
+    /* Tooltip driehoekje */
+    .tooltip .tooltiptext::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: rgba(15,15,15,0.95) transparent transparent transparent;
+    }
+
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    @media (max-width: 600px) {
+        .goodstuff-item { flex: 1 1 100%; }
+        .goodstuff-label { font-size: 13px; }
     }
     </style>
     """, unsafe_allow_html=True)
 
+    # --- Expander zelf ---
     with st.sidebar.expander("❤️ Good Stuff", expanded=False):
         st.caption("Activeer tools door ze aan/uit te zetten")
-        st.markdown('<div class="toggle-button-wrapper">', unsafe_allow_html=True)
 
-        # Toggle kolommen
-        cols = st.columns(5)
-        toggle_keys = ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]
-        toggle_icons = ["🔍", "🍅", "🐻", "⭐", "🎵"]
-        toggle_help = [
-            "Set Search: Zoek Set-Codes",
-            "Ketch-Up: Future Cards",
-            "Bear Search: Bears Rule!",
-            "Sheriff: Gametype Rules",
-            "Sound of Magic: MOB playlist"
+        toggle_data = [
+            ("zoekset_active", "🔍", "Set Search", "Zoek set-codes"),
+            ("ketchup_active", "🍅", "Ketch-Up", "Bekijk releases en spoilers"),
+            ("bear_search_active", "🐻", "Bear Search", "Zoek naar beren!"),
+            ("sheriff_active", "⭐", "Sheriff", "Bekijk Sheriff regels"),
+            ("sound_magic_active", "🎵", "Sound of Magic", "MOB playlist"),
         ]
 
-        # --- Render toggles ---
-        for i, (col, key, icon, help_text) in enumerate(zip(cols, toggle_keys, toggle_icons, toggle_help)):
-            button_key = f"{key}_btn"
-            clicked = col.button(icon, key=button_key, help=help_text)
-            if clicked:
-                st.session_state[key] = not st.session_state[key]  # toggle aan/uit
+        st.markdown('<div class="goodstuff-container">', unsafe_allow_html=True)
 
-        # --- Render ogen exact onder elke toggle ---
-        eye_cols = st.columns(5)
-        for i, key in enumerate(toggle_keys):
-            with eye_cols[i]:
-                if st.session_state.get(key):
-                    st.markdown("<div class='eye-glow'>👁️</div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='height:24px;'></div>", unsafe_allow_html=True)  # lege ruimte
+        for key, icon, label, help_text in toggle_data:
+            st.markdown('<div class="goodstuff-item">', unsafe_allow_html=True)
+
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                clicked = st.button(icon, key=f"{key}_btn", help=help_text)
+                if clicked:
+                    st.session_state[key] = not st.session_state[key]
+
+            with col2:
+                active = st.session_state.get(key, False)
+                active_class = "active" if active else ""
+                st.markdown(
+                    f"""
+                    <div class='goodstuff-label {active_class}'>
+                        {label}
+                        <span class="tooltip">
+                            <span class="goodstuff-help">?</span>
+                            <span class="tooltiptext">{help_text}</span>
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ------------------ Active Toggle Render ------------------
 def render_active_toggle_results():
