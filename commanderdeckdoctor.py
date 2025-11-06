@@ -9,6 +9,8 @@ import time
 import logging
 import tempfile
 from pathlib import Path
+from google import genai
+from google.genai import types
 
 # Streamlit
 import streamlit as st
@@ -1032,15 +1034,15 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
         sort_options,
         index=sort_options.index(st.session_state["sort_option"])
     )
+
 # -----------------------------------------------
 # 5.4 ❤️ GOOD STUFF Expander
 # -----------------------------------------------
-
 def sidebar_toggle_expander():
-    """Good Stuff toggles in sidebar met label, helper-icon en compacte layout"""
+    """Good Stuff toggles in sidebar — werkend en strak uitgelijnd"""
 
-    # Session state defaults
-    for key in ["zoekset_active","ketchup_active","bear_search_active","sheriff_active","sound_magic_active"]:
+    # --- Session state defaults ---
+    for key in ["zoekset_active", "ketchup_active", "bear_search_active", "sheriff_active", "sound_magic_active", "judge_active"]: # 'judge_active' toegevoegd
         st.session_state.setdefault(key, False)
 
     # --- CSS ---
@@ -1052,23 +1054,24 @@ def sidebar_toggle_expander():
         gap: 6px 10px;
         align-items: center;
         justify-content: flex-start;
+        margin-top: 8px;
     }
 
     .goodstuff-item {
         display: flex;
         align-items: center;
-        gap: 6px;
-        margin: 2px 0;
-        flex: 1 1 45%;
-        min-width: 140px;
+        gap: 10px;
+        flex: 1 1 48%;
+        min-width: 160px;
+        padding: 4px 6px;
     }
 
-    /* Knoppen */
-    .goodstuff-item .stButton > button { 
-        width: 44px !important; 
-        height: 44px !important; 
+    /* Knoppen styling */
+    .goodstuff-item .stButton > button {
+        width: 44px !important;
+        height: 44px !important;
         border-radius: 8px !important;
-        font-size: 26px !important; 
+        font-size: 26px !important;
         font-weight: bold !important;
         border: none !important;
         background: linear-gradient(to right, #111127, #011901) !important;
@@ -1077,35 +1080,34 @@ def sidebar_toggle_expander():
         transition: all 0.2s ease-in-out;
         padding: 0 !important;
     }
-
     .goodstuff-item .stButton > button:hover {
         transform: scale(1.1);
         box-shadow: 0 0 10px rgba(0,255,0,0.5);
         background: linear-gradient(to right, #1a1a1a, #002200) !important;
     }
 
-    /* Labels */
+    /* Label naast knop */
     .goodstuff-label {
+        flex: 1;
         font-size: 14px;
         color: #ddd;
         white-space: nowrap;
-        transition: color 0.25s ease-in-out, text-shadow 0.25s ease-in-out;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
-    /* Actieve glow */
     .goodstuff-label.active {
         color: #00ff00;
-        text-shadow: 0 0 4px #00ff00, 0 0 8px #00ff00, 0 0 12px #00ff00;
+        text-shadow: 0 0 4px #00ff00, 0 0 8px #00ff00;
         font-weight: 600;
     }
 
-    /* Help-icoon */
+    /* Helpicoon */
     .goodstuff-help {
-        font-size: 14px;
         color: #888;
-        margin-left: 6px;
         cursor: help;
-        display: inline-block;
+        font-weight: bold;
         transition: color 0.2s ease-in-out;
     }
     .goodstuff-help:hover {
@@ -1113,55 +1115,13 @@ def sidebar_toggle_expander():
         text-shadow: 0 0 4px #00ff00;
     }
 
-    /* Tooltip */
-    .tooltip {
-        position: relative;
-        display: inline-flex;
-        align-items: left;
-        justify-content: left;
-    }
-
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        opacity: 0;
-        background-color: rgba(15, 15, 15, 0.95);
-        color: #fff;
-        text-align: left;
-        border-radius: 6px;
-        padding: 6px 10px;
-        position: absolute;
-        bottom: 130%;
-        left: 50%;
-        transform: translateX(-50%);
-        transition: opacity 0.25s ease-in-out;
-        font-size: 12px;
-        line-height: 1.3em;
-        width: auto;
-        max-width: 240px;
-        white-space: nowrap;
-        box-shadow: 0 0 8px rgba(0,255,0,0.4);
-    }
-
-    /* Tooltip driehoekje */
-    .tooltip .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: rgba(15,15,15,0.95) transparent transparent transparent;
-    }
-
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-
     @media (max-width: 600px) {
-        .goodstuff-item { flex: 1 1 100%; }
-        .goodstuff-label { font-size: 13px; }
+        .goodstuff-item {
+            flex: 1 1 100%;
+        }
+        .goodstuff-label {
+            font-size: 13px;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1171,6 +1131,7 @@ def sidebar_toggle_expander():
         st.caption("Activeer tools door ze aan/uit te zetten")
 
         toggle_data = [
+            ("judge_active", "⚖️", "Judge Ruxa", "AI-Judge Bot"),
             ("zoekset_active", "🔍", "Set Search", "Zoek set-codes"),
             ("ketchup_active", "🍅", "Ketch-Up", "Bekijk releases en spoilers"),
             ("bear_search_active", "🐻", "Bear Search", "Zoek naar beren!"),
@@ -1182,8 +1143,8 @@ def sidebar_toggle_expander():
 
         for key, icon, label, help_text in toggle_data:
             st.markdown('<div class="goodstuff-item">', unsafe_allow_html=True)
-
             col1, col2 = st.columns([1, 4])
+
             with col1:
                 clicked = st.button(icon, key=f"{key}_btn", help=help_text)
                 if clicked:
@@ -1196,25 +1157,314 @@ def sidebar_toggle_expander():
                     f"""
                     <div class='goodstuff-label {active_class}'>
                         {label}
-                        <span class="tooltip">
-                            <span class="goodstuff-help">?</span>
-                            <span class="tooltiptext">{help_text}</span>
-                        </span>
+                        <span class="goodstuff-help" title="{help_text}">?</span>
                     </div>
                     """,
-                    unsafe_allow_html=True
+                    unsafe_allow_html=True,
                 )
 
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+
+# ==========================================================
+# JUDGE APP CODE BLOCK (Alles bij elkaar)
+# ==========================================================
+
+# --- CONFIGURATIE ---
+ASSISTANT_NAME = "Ruxa"
+ASSISTANT_TITLE = "Bear Judge"
+ASSISTANT_EMOJI = "🐻"
+
+# --- HELPER FUNCTIES (Niet-cachebaar) ---
+
+def _format_card_context(data):
+    """ Formatteert alle metadata en oracle text in een leesbare context string. """
+    oracle_text = data.get('oracle_text', 'Geen regels tekst gevonden.')
+    
+    # 1. Color Identity
+    color_identity_list = data.get('color_identity', [])
+    if color_identity_list:
+        color_map = {'W': 'Wit', 'U': 'Blauw', 'B': 'Zwart', 'R': 'Rood', 'G': 'Groen'}
+        colors = [color_map[c] for c in color_identity_list if c in color_map]
+        color_id_str = f"Color Identity: {', '.join(colors)}"
+    else:
+        color_id_str = "Color Identity: Kleurloos"
+        
+    # 2. Type Line, Mana Value, P/T
+    type_line = data.get('type_line', 'Type: Onbekend')
+    cmc = data.get('cmc')
+    cmc_str = f"Mana Value (CMC): {int(cmc)}" if cmc is not None else "Mana Value: Onbekend"
+    pt_str = ""
+    if 'power' in data and 'toughness' in data:
+        pt_str = f"Power/Toughness: {data['power']}/{data['toughness']}"
+        
+    metadata_block = f"{type_line} | {cmc_str} | {pt_str}".strip(' |')
+    
+    context_text = (
+        f"**Kaart: {data['name']}**\n"
+        f"**Metadata:** {metadata_block}\n"
+        f"{color_id_str}\n"
+        f"**Regeltekst:** {oracle_text}\n"
+    )
+    return context_text
+
+# --- CACHEBARE HELPER FUNCTIES (@st.cache_data vereist module-niveau) ---
+
+@st.cache_data(ttl=3600)
+def fetch_card_context_by_name(card_name):
+    """ Haalt ALLE context op voor een BEVESTIGDE kaartnaam (gebruikt exacte match). """
+    base_url = "https://api.scryfall.com/cards/named"
+    try:
+        response = requests.get(base_url, params={'exact': card_name}) 
+        response.raise_for_status() 
+        data = response.json()
+        return data['name'], _format_card_context(data)
+    except requests.exceptions.RequestException:
+        return card_name, f"**Kaart: {card_name}**\n*Kon kaartdata niet vinden of ophalen.*\n"
+
+
+@st.cache_data(ttl=3600)
+def get_card_suggestions(query):
+    """ Haalt een lijst van suggesties op via de Scryfall Autocomplete API. """
+    try:
+        response = requests.get(f"https://api.scryfall.com/cards/autocomplete?q={query}")
+        response.raise_for_status()
+        data = response.json()
+        suggestions = data.get('data', [])[:5]
+        return suggestions
+    except requests.exceptions.RequestException:
+        return []
+
+# --- GEMINI API WRAPPERS (Niet-cachebaar) ---
+
+def extract_card_names_gemini(client, user_query):
+    """ Gebruikt Gemini Flash om snel kaartnamen uit de tekst te extraheren. """
+    MODEL_NAME = 'gemini-2.5-flash' 
+    system_prompt = (
+        "Je taak is om alle specifieke Magic: The Gathering kaartnamen te identificeren en STRIKT te extraheren "
+        "uit de onderstaande tekst. Geef een output als een 'plain text' komma-gescheiden lijst (CSV) van kaartnamen. "
+        "Geef ABSOLUUT GEEN andere tekst, uitleg of opsommingstekens. "
+        "Als je geen kaartnamen vindt, retourneer dan een lege string."
+    )
+    
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[user_query],
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt
+            )
+        )
+        if response.text is None:
+             return []
+        card_names = [name.strip() for name in response.text.split(',') if name.strip()]
+        return card_names
+    except Exception as e:
+        st.error(f"Fout bij het extraheren van kaartnamen: {e}")
+        return []
+
+def get_ai_judge_response_gemini(client, question, card_context):
+    """ Stuurt de vraag en de geassembleerde context naar Gemini Flash. """
+    MODEL_NAME = 'gemini-2.5-flash'
+    system_prompt = (
+        f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
+        "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
+        "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
+        "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
+        "Gebruik Nederlandse taal en begin je antwoord direct met de uitspraak. "
+        "Als de kaarten niet relevant zijn of missen, vermeld dit kort."
+    )
+    user_message = (
+        f"--- CONTEXT VAN KAARTEN (INCL. METADATA) ---\n{card_context}\n"
+        f"--- REGELSVRAAG ---\n{question}\n\n"
+        "Wat is de Ruling van de Professor? (Uitspraak in het Nederlands):"
+    )
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[user_message],
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt
+            )
+        )
+        return response.text.strip()
+    
+    except Exception as e:
+        return f"Er is een fout opgetreden bij de Gemini API: {e}"
+
+
+# --- BELANGRIJKSTE JUDGE UI FUNCTIE ---
+
+def display_rules_judge_ui():
+    """ Toont de complete Ruxa Judge UI in de hoofdsectie van de Streamlit app. """
+    
+    # --- CLIENT INITIALISATIE ---
+    client = None
+    try:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except (FileNotFoundError, KeyError):
+        st.error(f"⚠️ Fout: Gemini API Key niet gevonden in st.secrets.")
+        st.caption("Voer de sleutel in of sla deze op in '.streamlit/secrets.toml'.")
+        GEMINI_API_KEY = st.text_input("Voer uw Gemini API Key in:")
+        if GEMINI_API_KEY:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+        else:
+            st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
+            return
+
+    # --- STATE INITIALISATIE (Met UNIEKE Keys) ---
+    if "judge_messages" not in st.session_state:
+        st.session_state["judge_messages"] = [{
+            "role": "assistant", 
+            "content": f"Hallo! Mijn naam is **{ASSISTANT_NAME}**, {ASSISTANT_TITLE}. Ik help u graag met de complexe regels van ons mooie spel."
+        }]
+        st.session_state["judge_last_extracted_cards"] = set()
+        st.session_state["judge_waiting_for_selection"] = False 
+        st.session_state["judge_suggested_card_names"] = {} 
+        st.session_state["judge_original_query_pending"] = None 
+        
+    # --- Interne helper functies met state logica ---
+
+    def _process_card_names(extracted_card_names):
+        """ Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. """
+        current_card_set = st.session_state["judge_last_extracted_cards"].union(set(extracted_card_names))
+        
+        new_suggestions = {}
+        
+        for name in current_card_set:
+            try:
+                suggestions = get_card_suggestions(name)
+                response = requests.get(f"https://api.scryfall.com/cards/named?exact={name}")
+                if response.status_code != 200 and suggestions:
+                    new_suggestions[name] = suggestions
+            except Exception:
+                continue
+                
+        if new_suggestions:
+            st.session_state["judge_waiting_for_selection"] = True
+            st.session_state["judge_suggested_card_names"] = new_suggestions
+            return False, new_suggestions
+            
+        st.session_state["judge_last_extracted_cards"] = current_card_set
+        return True, current_card_set
+
+    def _continue_processing_after_selection(confirmed_cards):
+        """ Voert de Judge-analyse uit nadat de gebruiker de kaartnamen heeft geselecteerd. """
+        
+        final_card_set = st.session_state["judge_last_extracted_cards"].union(set(confirmed_cards))
+        st.session_state["judge_last_extracted_cards"] = final_card_set
+        
+        card_context = ""
+        extracted_cards_list = []
+        
+        for name in final_card_set:
+            actual_name, context = fetch_card_context_by_name(name)
+            card_context += context + "\n"
+            extracted_cards_list.append(actual_name)
+        
+        user_query = st.session_state.pop("judge_original_query_pending")
+
+        extracted_message = f"gevonden Kaart(en): {', '.join(extracted_cards_list) if extracted_cards_list else 'Geen kaarten gevonden.'}"
+        st.session_state["judge_messages"].append({"role": "assistant", "content": extracted_message})
+        
+        st.chat_message("assistant", avatar=ASSISTANT_EMOJI).write(extracted_message)
+
+        with st.chat_message("assistant", avatar=ASSISTANT_EMOJI):
+            with st.spinner(f"🐻 De {ASSISTANT_TITLE} formuleert de definitieve uitspraak..."):
+                
+                if extracted_cards_list:
+                    st.markdown("---")
+                    st.markdown(f"**Kaart Context Gebruikt:** {', '.join(set(extracted_cards_list))}") 
+                
+                # Gebruik de globale Gemini wrapper
+                judge_response = get_ai_judge_response_gemini(client, user_query, card_context)
+                
+                st.write(judge_response)
+                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response})
+                
+        st.rerun() 
+        st.stop()
+        
+
+    # --- STREAMLIT APP LAYOUT & LOGICA ---
+
+    st.title(f"⚖️ MTG-Rules: Vraag Judge {ASSISTANT_NAME}")
+    
+    # --- CHAT GESCHIEDENIS TONEN ---
+    for msg in st.session_state["judge_messages"]:
+        if msg["role"] == "assistant":
+            st.chat_message(msg["role"], avatar=ASSISTANT_EMOJI).write(msg["content"])
+        else:
+            st.chat_message(msg["role"]).write(msg["content"])
+
+    # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
+
+    if st.session_state["judge_waiting_for_selection"]:
+        
+        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: Gelieve de bedoelde kaart(en) te selecteren:")
+        
+        selected_confirmed_cards = st.session_state["judge_last_extracted_cards"].copy()
+        
+        for original_term, suggestions in st.session_state["judge_suggested_card_names"].items():
+            
+            options = suggestions + [f"Geen van deze (Negeer '{original_term}')"]
+            
+            chosen_card = st.selectbox(
+                f"Bedoelde u met '_{original_term}_' de kaart:",
+                options,
+                key=f"judge_select_{original_term}" 
+            )
+            
+            if f"Geen van deze" not in chosen_card:
+                selected_confirmed_cards.add(chosen_card)
+
+        if st.button(f"Bevestig Selectie en Vraag de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
+            st.session_state["judge_waiting_for_selection"] = False
+            st.session_state["judge_suggested_card_names"] = {}
+            _continue_processing_after_selection(selected_confirmed_cards)
+            
+        st.stop() 
+
+    # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
+
+    if user_query := st.chat_input("Uw regelsvraag...", key="judge_chat_input"): 
+        
+        st.session_state["judge_messages"].append({"role": "user", "content": user_query})
+        st.chat_message("user").write(user_query)
+
+        st.session_state["judge_original_query_pending"] = user_query
+        
+        with st.spinner(f"🐻 {ASSISTANT_NAME} zoekt naar kaartnamen..."):
+            # Gebruik de globale Gemini wrapper
+            newly_extracted_cards = extract_card_names_gemini(client, user_query)
+        
+        is_clear, data = _process_card_names(newly_extracted_cards)
+        
+        if is_clear:
+            _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
+            
+        else:
+            st.rerun() 
+            
+# ==========================================================
+# EINDE JUDGE APP CODE BLOCK
+# ==========================================================
+
+
 # ------------------ Active Toggle Render ------------------
 def render_active_toggle_results():
     """Render alleen de actieve toggle in hoofdapp"""
 
+    # --------- ⚖️ JUDGE RUXA Toggle --------
+    if st.session_state.get("judge_active"):
+        display_rules_judge_ui()
+
     # --------- 🔍 SET SEARCH Toggle --------
-    if st.session_state.get("zoekset_active", False):
+    elif st.session_state.get("zoekset_active", False):
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
         sets_data = safe_api_call("https://api.scryfall.com/sets")
         spinner_ph.empty()
@@ -1449,7 +1699,7 @@ def render_active_toggle_results():
         render_cards_with_add(future_cards, columns=columns_per_row)
 
     # -------- 🐻 BEAR SEARCH Toggle --------
-    if st.session_state.get("bear_search_active", False):
+    elif st.session_state.get("bear_search_active", False):
         spinner_ph = show_mana_spinner("Bears Incoming...")
 
         # 1️⃣ Kaarten ophalen
@@ -1506,7 +1756,6 @@ def render_active_toggle_results():
 # ------------------ Aanroepen ------------------
 sidebar_toggle_expander()
 render_active_toggle_results()
-
 # -----------------------------------------------
 # 5.6 ❓README knop
 # -----------------------------------------------
