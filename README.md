@@ -1,6 +1,6 @@
-# CommanderDeckDoctor
+#CommanderDeckDoctor
 
-CommanderDeckDoctor is een app voor Commander-spelers van Magic: The Gathering.  
+Een app voor Magic: The Gathering Commander-spelers.  
 De app helpt om snel nieuwe kaarten te vinden voor bestaande decks.
 Daarnaast zijn er handige tools om je game-time en spare-time mee te vullen. 
 
