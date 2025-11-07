@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 from google import genai
 from google.genai import types
+import html
 
 # Streamlit
 import streamlit as st
@@ -1124,10 +1125,204 @@ def render_active_toggle_results():
         display_sound_magic_ui()
 
 
-
 # --------- ⚖️ JUDGE RUXA Toggle --------
 def display_rules_judge_ui():
-    st.write("⚖️ Judge Ruxa UI content placeholder")
+    
+    # --- CLIENT INITIALISATIE ---
+    client = None
+    try:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except (FileNotFoundError, KeyError):
+        st.error(f"⚠️ Fout: Gemini API Key niet gevonden in st.secrets.")
+        st.caption("Voer de sleutel in of sla deze op in '.streamlit/secrets.toml'.")
+        GEMINI_API_KEY = st.text_input("Voer uw Gemini API Key in:")
+        if GEMINI_API_KEY:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+        else:
+            st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
+            return
+
+    # --- STATE INITIALISATIE ---
+    if "judge_messages" not in st.session_state:
+        # Start met lege chat, omdat de introductie nu in de banner staat
+        st.session_state["judge_messages"] = [] 
+        st.session_state["judge_last_extracted_cards"] = set()
+        st.session_state["judge_waiting_for_selection"] = False 
+        st.session_state["judge_suggested_card_names"] = {} 
+        st.session_state["judge_original_query_pending"] = None 
+        
+    # --- Interne helper functies met state logica ---
+
+    def _process_card_names(extracted_card_names):
+        """ 
+        Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. 
+        FIX: Controleer alleen de NIEUW geëxtraheerde kaarten op onzekerheid.
+        """
+        
+        current_card_set = st.session_state["judge_last_extracted_cards"]
+        
+        new_suggestions = {}
+        confirmed_new_cards = set()
+        
+        # We controleren ALLEEN de nieuwe namen uit de AI-output
+        for name in extracted_card_names:
+            try:
+                # Probeer de kaart exact te vinden
+                response = requests.get(f"https://api.scryfall.com/cards/named?exact={name}")
+                
+                if response.status_code == 200:
+                    # Kaart exact gevonden
+                    confirmed_new_cards.add(name)
+                else:
+                    # Exacte kaart niet gevonden, zoek naar suggesties
+                    suggestions = get_card_suggestions(name)
+                    
+                    if suggestions:
+                        new_suggestions[name] = suggestions
+                        
+            except Exception:
+                continue
+                
+        # Update de algemene set met de nieuw bevestigde kaarten (zodat we ze niet opnieuw controleren)
+        st.session_state["judge_last_extracted_cards"] = current_card_set.union(confirmed_new_cards)
+        
+        if new_suggestions:
+            st.session_state["judge_waiting_for_selection"] = True
+            st.session_state["judge_suggested_card_names"] = new_suggestions
+            return False, new_suggestions
+            
+        # Geen suggesties nodig
+        return True, st.session_state["judge_last_extracted_cards"]
+
+
+    def _continue_processing_after_selection(confirmed_cards):
+        """ Voert de Judge-analyse uit nadat de gebruiker de kaartnamen heeft geselecteerd. """
+        
+        # Zorg ervoor dat de set van eerder bevestigde kaarten meegaat
+        final_card_set = st.session_state["judge_last_extracted_cards"].union(set(confirmed_cards))
+        st.session_state["judge_last_extracted_cards"] = final_card_set
+        
+        st.session_state["judge_waiting_for_selection"] = False # Reset status
+        
+        card_context = ""
+        extracted_cards_list = []
+        
+        for name in final_card_set:
+            actual_name, context = fetch_card_context_by_name(name)
+            card_context += context + "\n"
+            extracted_cards_list.append(actual_name)
+        
+        user_query = st.session_state.pop("judge_original_query_pending")
+
+        extracted_message = f"gevonden Kaart(en): {', '.join(extracted_cards_list) if extracted_cards_list else 'Geen kaarten gevonden.'}"
+        st.session_state["judge_messages"].append({"role": "assistant", "content": extracted_message})
+        
+        st.chat_message("assistant", avatar=ASSISTANT_EMOJI).write(extracted_message)
+
+        with st.chat_message("assistant", avatar=ASSISTANT_EMOJI):
+            with st.spinner(f"🐻 De {ASSISTANT_TITLE} formuleert de definitieve uitspraak..."):
+                
+                if extracted_cards_list:
+                    st.markdown("---")
+                    st.markdown(f"**Kaart Context Gebruikt:** {', '.join(set(extracted_cards_list))}") 
+                
+                # Gebruik de globale Gemini wrapper
+                judge_response = get_ai_judge_response_gemini(client, user_query, card_context)
+                
+                st.write(judge_response)
+                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response})
+                
+        st.rerun() 
+        st.stop()
+        
+
+    # --- LAYOUT & LOGICA ---
+
+
+    # --- JUDGE BANNER ---
+    col_img, col_title = st.columns([1, 6]) 
+
+    with col_img:
+        st.image("Ruxa.png", width=200) 
+
+    with col_title:
+        st.header(f"U heeft een vraag?") 
+
+    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**, **{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel."
+    st.markdown(f"{intro_text}")
+    
+    # --- CHAT GESCHIEDENIS TONEN ---
+    for msg in st.session_state["judge_messages"]:
+        avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
+        st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
+
+
+    # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
+
+    if st.session_state["judge_waiting_for_selection"]:
+        
+        st.warning(f"Welke kaart bedoel je?")
+        
+        # De suggestie-UI toont nu alleen de onzekere kaarten uit de nieuwe suggesties
+        selected_confirmed_cards = set()
+        
+        for original_term, suggestions in st.session_state["judge_suggested_card_names"].items():
+            
+            options = suggestions + [f"Geen van deze (Negeer '{original_term}')"]
+            
+            chosen_card = st.selectbox(
+                f"Bedoelde u met '_{original_term}_' de kaart:",
+                options,
+                key=f"judge_select_{original_term}" 
+            )
+            
+            if f"Geen van deze" not in chosen_card:
+                selected_confirmed_cards.add(chosen_card)
+
+        if st.button(f"Bevestig je selectie voor de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
+            st.session_state["judge_waiting_for_selection"] = False
+            st.session_state["judge_suggested_card_names"] = {}
+            _continue_processing_after_selection(selected_confirmed_cards)
+            
+        st.stop() 
+
+    col_clear, col_spacer = st.columns([1, 10]) 
+
+    with col_clear:
+        # Toon de knop enkel als er berichten zijn om te wissen
+        if st.session_state.get("judge_messages"):
+            st.button(
+                "🗑️", 
+                on_click=clear_judge_chat_history, 
+                help="Verwijder chatgeschiedenis", # Handige tooltip
+                key="clear_chat_icon"
+            )
+
+    # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
+
+    if user_query := st.chat_input("Wat is uw vraag?", key="judge_chat_input"): 
+        
+        st.session_state["judge_messages"].append({"role": "user", "content": user_query})
+        # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
+        st.chat_message("user", avatar=USER_AVATAR_EMOJI).write(user_query)
+
+        st.session_state["judge_original_query_pending"] = user_query
+        
+        with st.spinner(f"🐻 {ASSISTANT_NAME} zoekt naar kaartnamen..."):
+            # Gebruik de globale Gemini wrapper
+            newly_extracted_cards = extract_card_names_gemini(client, user_query)
+        
+        # Gebruik de bijgewerkte logica
+        is_clear, data = _process_card_names(newly_extracted_cards)
+        
+        if is_clear:
+            # Als alles duidelijk is, ga direct door
+            _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
+            
+        else:
+            # Anders, toon de selectie-UI
+            st.rerun()
 
 # --- CONFIGURATIE ---
 ASSISTANT_NAME = "Ruxa"
@@ -1228,14 +1423,15 @@ def extract_card_names_gemini(client, user_query):
         )
         if response.text is None:
              return []
+        # Schoon de output op in het geval de AI toch extra tekst toevoegt (CSV parsing)
         card_names = [name.strip() for name in response.text.split(',') if name.strip()]
         return card_names
     except Exception as e:
         st.error(f"Fout bij het extraheren van kaartnamen: {e}")
         return []
 
+# Nieuwe code
 def get_ai_judge_response_gemini(client, question, card_context):
-    """ Stuurt de vraag en de geassembleerde context naar Gemini Flash. """
     MODEL_NAME = 'gemini-2.5-flash'
     system_prompt = (
         f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
@@ -1249,7 +1445,7 @@ def get_ai_judge_response_gemini(client, question, card_context):
     user_message = (
         f"--- CONTEXT VAN KAARTEN (INCL. METADATA) ---\n{card_context}\n"
         f"--- REGELSVRAAG ---\n{question}\n\n"
-        "Wat is de Ruling van de Professor? (Uitspraak in het Nederlands):"
+        "**Wat is de Ruling (Uitspraak in het Nederlands)?**" 
     )
 
     try:
@@ -1264,182 +1460,6 @@ def get_ai_judge_response_gemini(client, question, card_context):
     
     except Exception as e:
         return f"Er is een fout opgetreden bij de Gemini API: {e}"
-
-
-# --- BELANGRIJKSTE JUDGE UI FUNCTIE ---
-
-def display_rules_judge_ui():
-    """ Toont de complete Ruxa Judge UI in de hoofdsectie van de Streamlit app. """
-    
-    # --- CLIENT INITIALISATIE ---
-    client = None
-    try:
-        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except (FileNotFoundError, KeyError):
-        st.error(f"⚠️ Fout: Gemini API Key niet gevonden in st.secrets.")
-        st.caption("Voer de sleutel in of sla deze op in '.streamlit/secrets.toml'.")
-        GEMINI_API_KEY = st.text_input("Voer uw Gemini API Key in:")
-        if GEMINI_API_KEY:
-            client = genai.Client(api_key=GEMINI_API_KEY)
-        else:
-            st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
-            return
-
-    # --- STATE INITIALISATIE ---
-    if "judge_messages" not in st.session_state:
-        # Start met lege chat, omdat de introductie nu in de banner staat
-        st.session_state["judge_messages"] = [] 
-        st.session_state["judge_last_extracted_cards"] = set()
-        st.session_state["judge_waiting_for_selection"] = False 
-        st.session_state["judge_suggested_card_names"] = {} 
-        st.session_state["judge_original_query_pending"] = None 
-        
-    # --- Interne helper functies met state logica ---
-
-    def _process_card_names(extracted_card_names):
-        """ Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. """
-        current_card_set = st.session_state["judge_last_extracted_cards"].union(set(extracted_card_names))
-        
-        new_suggestions = {}
-        
-        for name in current_card_set:
-            try:
-                suggestions = get_card_suggestions(name)
-                response = requests.get(f"https://api.scryfall.com/cards/named?exact={name}")
-                if response.status_code != 200 and suggestions:
-                    new_suggestions[name] = suggestions
-            except Exception:
-                continue
-                
-        if new_suggestions:
-            st.session_state["judge_waiting_for_selection"] = True
-            st.session_state["judge_suggested_card_names"] = new_suggestions
-            return False, new_suggestions
-            
-        st.session_state["judge_last_extracted_cards"] = current_card_set
-        return True, current_card_set
-
-    def _continue_processing_after_selection(confirmed_cards):
-        """ Voert de Judge-analyse uit nadat de gebruiker de kaartnamen heeft geselecteerd. """
-        
-        final_card_set = st.session_state["judge_last_extracted_cards"].union(set(confirmed_cards))
-        st.session_state["judge_last_extracted_cards"] = final_card_set
-        
-        card_context = ""
-        extracted_cards_list = []
-        
-        for name in final_card_set:
-            actual_name, context = fetch_card_context_by_name(name)
-            card_context += context + "\n"
-            extracted_cards_list.append(actual_name)
-        
-        user_query = st.session_state.pop("judge_original_query_pending")
-
-        extracted_message = f"gevonden Kaart(en): {', '.join(extracted_cards_list) if extracted_cards_list else 'Geen kaarten gevonden.'}"
-        st.session_state["judge_messages"].append({"role": "assistant", "content": extracted_message})
-        
-        st.chat_message("assistant", avatar=ASSISTANT_EMOJI).write(extracted_message)
-
-        with st.chat_message("assistant", avatar=ASSISTANT_EMOJI):
-            with st.spinner(f"🐻 De {ASSISTANT_TITLE} formuleert de definitieve uitspraak..."):
-                
-                if extracted_cards_list:
-                    st.markdown("---")
-                    st.markdown(f"**Kaart Context Gebruikt:** {', '.join(set(extracted_cards_list))}") 
-                
-                # Gebruik de globale Gemini wrapper
-                judge_response = get_ai_judge_response_gemini(client, user_query, card_context)
-                
-                st.write(judge_response)
-                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response})
-                
-        st.rerun() 
-        st.stop()
-        
-
-    # --- LAYOUT & LOGICA ---
-
-
-    # --- JUDGE BANNER ---
-    col_img, col_title = st.columns([1, 6]) # Kleine kolom voor de afbeelding, grote voor de titel
-
-    with col_img:
-        st.image("Ruxa.png", width=200)
-
-    with col_title:
-        st.header(f"U heeft een vraag?") 
-
-    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**,**{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel. Wat is uw vraag?"
-    st.markdown(f"*{intro_text}*")
-    
-    # --- CHAT GESCHIEDENIS TONEN ---
-    for msg in st.session_state["judge_messages"]:
-        avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
-        st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
-
-
-    # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
-
-    if st.session_state["judge_waiting_for_selection"]:
-        
-        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: selecteer je bedoelde kaart(en):")
-        
-        selected_confirmed_cards = st.session_state["judge_last_extracted_cards"].copy()
-        
-        for original_term, suggestions in st.session_state["judge_suggested_card_names"].items():
-            
-            options = suggestions + [f"Geen van deze (Negeer '{original_term}')"]
-            
-            chosen_card = st.selectbox(
-                f"Bedoelde u met '_{original_term}_' de kaart:",
-                options,
-                key=f"judge_select_{original_term}" 
-            )
-            
-            if f"Geen van deze" not in chosen_card:
-                selected_confirmed_cards.add(chosen_card)
-
-        if st.button(f"Bevestig Selectie en Vraag de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
-            st.session_state["judge_waiting_for_selection"] = False
-            st.session_state["judge_suggested_card_names"] = {}
-            _continue_processing_after_selection(selected_confirmed_cards)
-            
-        st.stop() 
-
-    col_clear, col_spacer = st.columns([1, 10]) 
-
-    with col_clear:
-        # Toon de knop enkel als er berichten zijn om te wissen
-        if st.session_state.get("judge_messages"):
-            st.button(
-                "🗑️", 
-                on_click=clear_judge_chat_history, 
-                help="Verwijder chatgeschiedenis", # Handige tooltip
-                key="clear_chat_icon"
-            )
-
-    # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
-
-    if user_query := st.chat_input("Uw regelvraag...", key="judge_chat_input"): 
-        
-        st.session_state["judge_messages"].append({"role": "user", "content": user_query})
-        # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
-        st.chat_message("user", avatar=USER_AVATAR_EMOJI).write(user_query)
-
-        st.session_state["judge_original_query_pending"] = user_query
-        
-        with st.spinner(f"🐻 {ASSISTANT_NAME} zoekt naar kaartnamen..."):
-            # Gebruik de globale Gemini wrapper
-            newly_extracted_cards = extract_card_names_gemini(client, user_query)
-        
-        is_clear, data = _process_card_names(newly_extracted_cards)
-        
-        if is_clear:
-            _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
-            
-        else:
-            st.rerun()
             
 # --------- 🔍 SET SEARCH Toggle --------
 def display_set_search_ui():
