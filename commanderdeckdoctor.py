@@ -1036,159 +1036,106 @@ with st.sidebar.expander("🖥️ Weergave", expanded=False):
     )
 
 # -----------------------------------------------
-# 5.4 ❤️ GOOD STUFF Expander
+# 5.4 ❤️ GOOD STUFF Expander (2 kolommen)
 # -----------------------------------------------
 def sidebar_toggle_expander():
-    """Good Stuff toggles in sidebar — werkend en strak uitgelijnd"""
+    """Good Stuff toggles in sidebar — 2 kolommen, icon-buttons met labels gecentreerd"""
 
-    # --- Session state defaults ---
-    for key in ["zoekset_active", "ketchup_active", "bear_search_active", "sheriff_active", "sound_magic_active", "judge_active"]: # 'judge_active' toegevoegd
-        st.session_state.setdefault(key, False)
+    toggle_keys = ["judge_active", "zoekset_active", "ketchup_active",
+                   "bear_search_active", "sheriff_active", "sound_magic_active"]
+    toggle_icons = ["⚖️", "🔍", "🍅", "🐻", "⭐", "🎵"]
+    toggle_labels = ["Judge Ruxa", "Set Search", "Ketch-Up", "Bear Search", "Sheriff", "Sound of Magic"]
+    toggle_help = ["AI-Judge Bot", "Zoek set-codes", "Bekijk releases en spoilers",
+                   "Zoek naar beren!", "Bekijk Sheriff regels", "MOB playlist"]
 
-    # --- CSS ---
+    st.session_state.setdefault("active_goodstuff", None)
+
+    # --- CSS voor gecentreerde labels ---
     st.markdown("""
     <style>
-    .goodstuff-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 10px;
-        align-items: center;
-        justify-content: flex-start;
-        margin-top: 8px;
-    }
-
-    .goodstuff-item {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex: 1 1 48%;
-        min-width: 160px;
-        padding: 4px 6px;
-    }
-
-    /* Knoppen styling */
-    .goodstuff-item .stButton > button {
-        width: 44px !important;
-        height: 44px !important;
-        border-radius: 8px !important;
-        font-size: 26px !important;
-        font-weight: bold !important;
-        border: none !important;
-        background: linear-gradient(to right, #111127, #011901) !important;
-        color: white !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.5) !important;
-        transition: all 0.2s ease-in-out;
-        padding: 0 !important;
-    }
-    .goodstuff-item .stButton > button:hover {
-        transform: scale(1.1);
-        box-shadow: 0 0 10px rgba(0,255,0,0.5);
-        background: linear-gradient(to right, #1a1a1a, #002200) !important;
-    }
-
-    /* Label naast knop */
     .goodstuff-label {
-        flex: 1;
         font-size: 14px;
         color: #ddd;
-        white-space: nowrap;
         display: flex;
         align-items: center;
         gap: 6px;
     }
-
     .goodstuff-label.active {
         color: #00ff00;
-        text-shadow: 0 0 4px #00ff00, 0 0 8px #00ff00;
         font-weight: 600;
+        text-shadow: 0 0 4px #00ff00,0 0 8px #00ff00;
     }
-
-    /* Helpicoon */
-    .goodstuff-help {
-        color: #888;
-        cursor: help;
-        font-weight: bold;
-        transition: color 0.2s ease-in-out;
-    }
-    .goodstuff-help:hover {
-        color: #00ff00;
-        text-shadow: 0 0 4px #00ff00;
-    }
-
-    @media (max-width: 600px) {
-        .goodstuff-item {
-            flex: 1 1 100%;
-        }
-        .goodstuff-label {
-            font-size: 13px;
-        }
-    }
+    .goodstuff-help { color: #888; cursor: help; font-weight: bold; }
+    .goodstuff-help:hover { color: #00ff00; text-shadow: 0 0 4px #00ff00; }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- Expander zelf ---
+    # --- Expander ---
     with st.sidebar.expander("❤️ Good Stuff", expanded=False):
         st.caption("Activeer tools door ze aan/uit te zetten")
 
-        toggle_data = [
-            ("judge_active", "⚖️", "Judge Ruxa", "AI-Judge Bot"),
-            ("zoekset_active", "🔍", "Set Search", "Zoek set-codes"),
-            ("ketchup_active", "🍅", "Ketch-Up", "Bekijk releases en spoilers"),
-            ("bear_search_active", "🐻", "Bear Search", "Zoek naar beren!"),
-            ("sheriff_active", "⭐", "Sheriff", "Bekijk Sheriff regels"),
-            ("sound_magic_active", "🎵", "Sound of Magic", "MOB playlist"),
-        ]
+        # Loop in stappen van 2 om rijen van 2 kolommen te maken
+        for i in range(0, len(toggle_keys), 2):
+            cols = st.columns(2)
+            for j in range(2):
+                idx = i + j
+                if idx >= len(toggle_keys):
+                    break
+                key = toggle_keys[idx]
+                icon = toggle_icons[idx]
+                label = toggle_labels[idx]
+                help_text = toggle_help[idx]
 
-        st.markdown('<div class="goodstuff-container">', unsafe_allow_html=True)
+                with cols[j]:
+                    # Button
+                    active = st.session_state.get("active_goodstuff") == key
+                    if st.button(icon, key=f"{key}_btn"):
+                        st.session_state["active_goodstuff"] = None if active else key
 
-        for key, icon, label, help_text in toggle_data:
-            st.markdown('<div class="goodstuff-item">', unsafe_allow_html=True)
-            col1, col2 = st.columns([1, 4])
+                    # Label + help
+                    active_class = "active" if st.session_state.get("active_goodstuff") == key else ""
+                    st.markdown(
+                        f"""
+                        <div class='goodstuff-label {active_class}'>
+                            {label}
+                            <span class="goodstuff-help" title="{help_text}">?</span>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-            with col1:
-                clicked = st.button(icon, key=f"{key}_btn", help=help_text)
-                if clicked:
-                    st.session_state[key] = not st.session_state[key]
-
-            with col2:
-                active = st.session_state.get(key, False)
-                active_class = "active" if active else ""
-                st.markdown(
-                    f"""
-                    <div class='goodstuff-label {active_class}'>
-                        {label}
-                        <span class="goodstuff-help" title="{help_text}">?</span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ------------------ Active Toggle Render ------------------
+# --- Active Toggle Render met stub-functies ---
 def render_active_toggle_results():
-    """Render alleen de actieve toggle in hoofdapp"""
+    """Render de UI van de actieve Good Stuff toggle"""
 
-    # --------- ⚖️ JUDGE RUXA Toggle --------
-    if st.session_state.get("judge_active"):
+    active = st.session_state.get("active_goodstuff")
+
+    if active == "judge_active":
         display_rules_judge_ui()
+    if active == "zoekset_active":
+        display_set_search_ui()
+    if active == "ketchup_active":
+        display_ketchup_ui()
+    if active == "bear_search_active":
+        display_bear_search_ui()
+    if active == "sheriff_active":
+        display_sheriff_ui()
+    if active == "sound_magic_active":
+        display_sound_magic_ui()
 
-# ==========================================================
-# JUDGE RUXA
-# ==========================================================
+
+
+# --------- ⚖️ JUDGE RUXA Toggle --------
+def display_rules_judge_ui():
+    st.write("⚖️ Judge Ruxa UI content placeholder")
 
 # --- CONFIGURATIE ---
 ASSISTANT_NAME = "Ruxa"
 ASSISTANT_TITLE = "Bear Judge"
 ASSISTANT_EMOJI = "🐻"
-
-# Nieuwe constante voor de user avatar, naast de andere constanten
 USER_AVATAR_EMOJI = "🧙" 
 
-
-# --- HELPER FUNCTIES (Niet-cachebaar) ---
+# --- HELPER FUNCTIES ---
 
 def _format_card_context(data):
     """ Formatteert alle metadata en oracle text in een leesbare context string. """
@@ -1232,7 +1179,7 @@ def clear_judge_chat_history():
     st.session_state.pop("judge_original_query_pending", None) 
     st.session_state.pop("judge_last_extracted_cards", None)
     
-# --- CACHEBARE HELPER FUNCTIES (@st.cache_data vereist module-niveau) ---
+# --- CACHEBARE HELPER FUNCTIES ---
 
 @st.cache_data(ttl=3600)
 def fetch_card_context_by_name(card_name):
@@ -1259,7 +1206,7 @@ def get_card_suggestions(query):
     except requests.exceptions.RequestException:
         return []
 
-# --- GEMINI API WRAPPERS (Niet-cachebaar) ---
+# --- GEMINI API WRAPPERS ---
 
 def extract_card_names_gemini(client, user_query):
     """ Gebruikt Gemini Flash om snel kaartnamen uit de tekst te extraheren. """
@@ -1339,7 +1286,7 @@ def display_rules_judge_ui():
             st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
             return
 
-    # --- STATE INITIALISATIE (Met UNIEKE Keys) ---
+    # --- STATE INITIALISATIE ---
     if "judge_messages" not in st.session_state:
         # Start met lege chat, omdat de introductie nu in de banner staat
         st.session_state["judge_messages"] = [] 
@@ -1411,35 +1358,13 @@ def display_rules_judge_ui():
         st.stop()
         
 
-    # --- STREAMLIT APP LAYOUT & LOGICA ---
+    # --- LAYOUT & LOGICA ---
 
-    # --- BEGIN AANGEPASTE CSS VOOR AVATAR KLEUREN (GEFIXED) ---
-    USER_BG_COLOR = "#50C878"  # Green
-    ASSISTANT_BG_COLOR = "#9370DB" # Purple
 
-    custom_css = f"""
-    <style>
-    /* FIX: Target de directe DIV (de cirkel) binnen de data-testid container */
-    
-    /* User Avatar (Wizard with Green Background) */
-    [data-testid="stChatMessageAvatarUser"] > div {{
-        background-color: {USER_BG_COLOR} !important;
-    }}
-
-    /* Assistant Avatar (Bear with Purple Background) */
-    [data-testid="stChatMessageAvatarAssistant"] > div {{
-        background-color: {ASSISTANT_BG_COLOR} !important;
-    }}
-    </style>
-    """
-    st.markdown(custom_css, unsafe_allow_html=True)
-    # --- EINDE AANGEPASTE CSS ---
-
-    # --- JUDGE BANNER (AANGEPAST) ---
+    # --- JUDGE BANNER ---
     col_img, col_title = st.columns([1, 6]) # Kleine kolom voor de afbeelding, grote voor de titel
 
     with col_img:
-        # Gebruik de 'width' parameter om de afbeelding klein te houden
         st.image("Ruxa.png", width=200)
 
     with col_title:
@@ -1447,11 +1372,9 @@ def display_rules_judge_ui():
 
     intro_text = f"Mijn naam is **{ASSISTANT_NAME}**,**{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel. Wat is uw vraag?"
     st.markdown(f"*{intro_text}*")
-    # --- EINDE JUDGE BANNER ---
     
     # --- CHAT GESCHIEDENIS TONEN ---
     for msg in st.session_state["judge_messages"]:
-        # Gebruik de juiste emoji voor de avatar, nu expliciet voor beide rollen
         avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
         st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
 
@@ -1518,8 +1441,8 @@ def display_rules_judge_ui():
         else:
             st.rerun()
             
-    # --------- 🔍 SET SEARCH Toggle --------
-    elif st.session_state.get("zoekset_active", False):
+# --------- 🔍 SET SEARCH Toggle --------
+def display_set_search_ui():
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
         sets_data = safe_api_call("https://api.scryfall.com/sets")
         spinner_ph.empty()
@@ -1619,8 +1542,8 @@ def display_rules_judge_ui():
         else:
             st.error("Geen sets gevonden.")
 
-    # -------- 🍅 KETCH-UP Toggle --------
-    elif st.session_state.get("ketchup_active", False):
+# -------- 🍅 KETCH-UP Toggle --------
+def display_ketchup_ui():
 
         today = date.today().isoformat()
 
@@ -1753,8 +1676,8 @@ def display_rules_judge_ui():
         columns_per_row = st.session_state.get("cards_per_row", 6)
         render_cards_with_add(future_cards, columns=columns_per_row)
 
-    # -------- 🐻 BEAR SEARCH Toggle --------
-    elif st.session_state.get("bear_search_active", False):
+# -------- 🐻 BEAR SEARCH Toggle --------
+def display_bear_search_ui():
         spinner_ph = show_mana_spinner("Bears Incoming...")
 
         # 1️⃣ Kaarten ophalen
@@ -1768,8 +1691,8 @@ def display_rules_judge_ui():
 
         render_cards_with_add(bear_cards)
 
-    # -------- ⭐ SHERIFF Toggle --------
-    elif st.session_state.get("sheriff_active", False):
+# -------- ⭐ SHERIFF Toggle --------
+def display_sheriff_ui():
         from pathlib import Path
 
         try:
@@ -1786,8 +1709,8 @@ def display_rules_judge_ui():
         except FileNotFoundError:
             st.error(f"Afbeelding '{sheriff_path}' niet gevonden.")
 
-    # -------- 🎵 SOUND OF MAGIC Toggle --------
-    elif st.session_state.get("sound_magic_active", False):
+# -------- 🎵 SOUND OF MAGIC Toggle --------
+def display_sound_magic_ui():
         st.subheader("")
         st.markdown("""
         <div style="
@@ -1811,6 +1734,7 @@ def display_rules_judge_ui():
 # ------------------ Aanroepen ------------------
 sidebar_toggle_expander()
 render_active_toggle_results()
+
 # -----------------------------------------------
 # 5.6 ❓README knop
 # -----------------------------------------------
