@@ -12,6 +12,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 import html
+import base64
 
 # Streamlit
 import streamlit as st
@@ -51,6 +52,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
 # ------------------ Logging ------------------
 logging.basicConfig(
     level=logging.WARNING,
@@ -1356,22 +1358,53 @@ USER_AVATAR_EMOJI = "🧙"
 
 # --- HELPER FUNCTIES ---
 
-def get_svg_tag(symbol_code, size='1.2em'):
-    """ Genereert de HTML <img> tag voor een Scryfall SVG-symbool. """
+# NIEUWE HULPFUNCTIE: Cachet de SVG-data lokaal
+@st.cache_data(ttl=60 * 60 * 24 * 7) # Cache 1 week
+def fetch_mana_svg_as_base64(symbol_code_content):
+    """ Haalt de SVG op van Scryfall en converteert deze naar een Base64 Data URI. """
     BASE_SVG_URL = "https://svgs.scryfall.io/card-symbols/"
     
-    symbol_code_content = symbol_code.strip('{}')
     symbol_filename = symbol_code_content
-    
     if '/' in symbol_filename:
         symbol_filename = symbol_filename.replace('/', '') 
-    
     if symbol_filename.startswith('ext'):
         symbol_filename = symbol_filename.replace('ext', '')
-        
+
     url = f"{BASE_SVG_URL}{symbol_filename}.svg"
     
-    return f'<img src="{url}" style="width:{size}; height:{size}; vertical-align:middle; margin:0 1px;" alt="{symbol_code_content}">'
+    try:
+        # We gebruiken requests om de SVG data op te halen (deze stap werkt blijkbaar)
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        
+        # De SVG-data direct inlezen
+        svg_content = response.text
+        
+        # Gebruik een Base64-versie om de SVG inline te maken
+        import base64
+        encoded = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
+        
+        # We sturen de Base64 data URI terug
+        return f"data:image/svg+xml;base64,{encoded}"
+
+    except Exception:
+        # Fallback in geval van fout
+        return f"ERROR"
+
+
+def get_svg_tag(symbol_code, size='1.2em'):
+    """ Genereert de HTML <img> tag met de Base64 Data URI. """
+    symbol_code_content = symbol_code.strip('{}')
+    
+    # Haal de Base64 URI op uit de cache
+    data_uri = fetch_mana_svg_as_base64(symbol_code_content)
+    
+    if data_uri == "ERROR":
+        # Valideer met een fallback-tekst
+        return f'<span style="border:1px solid #777; padding:0 2px; border-radius:3px; background:#ddd; font-size:{size}; line-height:{size};">{symbol_code_content}</span>'
+    
+    # Gebruik de Base64 URI in de src-attribuut
+    return f'<img src="{data_uri}" style="width:{size}; height:{size}; vertical-align:middle; margin:0 1px;" alt="{symbol_code_content}">'
 
 def _post_process_ruling_with_svg(ruling_text):
     """ Zoekt en vervangt alle Magic symbolen in de Ruling door SVG HTML-tags. """
@@ -1541,7 +1574,7 @@ def get_ai_judge_response_gemini(client, question, card_context):
     
     except Exception as e:
         return f"Er is een fout opgetreden bij de Gemini API: {e}"
-
+            
 # --------- 🔍 SET SEARCH Toggle --------
 def display_set_search_ui():
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
