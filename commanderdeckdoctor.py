@@ -1167,6 +1167,13 @@ def sidebar_toggle_expander():
 
         st.markdown('</div>', unsafe_allow_html=True)
 
+# ------------------ Active Toggle Render ------------------
+def render_active_toggle_results():
+    """Render alleen de actieve toggle in hoofdapp"""
+
+    # --------- ⚖️ JUDGE RUXA Toggle --------
+    if st.session_state.get("judge_active"):
+        display_rules_judge_ui()
 
 # ==========================================================
 # JUDGE RUXA
@@ -1176,6 +1183,10 @@ def sidebar_toggle_expander():
 ASSISTANT_NAME = "Ruxa"
 ASSISTANT_TITLE = "Bear Judge"
 ASSISTANT_EMOJI = "🐻"
+
+# Nieuwe constante voor de user avatar, naast de andere constanten
+USER_AVATAR_EMOJI = "🧙" 
+
 
 # --- HELPER FUNCTIES (Niet-cachebaar) ---
 
@@ -1210,6 +1221,17 @@ def _format_card_context(data):
     )
     return context_text
 
+def clear_judge_chat_history():
+    """Verwijdert de chatgeschiedenis en gerelateerde statusvariabelen."""
+    
+    # Maak de lijst met berichten leeg
+    if "judge_messages" in st.session_state:
+        st.session_state["judge_messages"] = []
+        
+    # Wis gerelateerde statusvariabelen voor een schone start
+    st.session_state.pop("judge_original_query_pending", None) 
+    st.session_state.pop("judge_last_extracted_cards", None)
+    
 # --- CACHEBARE HELPER FUNCTIES (@st.cache_data vereist module-niveau) ---
 
 @st.cache_data(ttl=3600)
@@ -1271,7 +1293,7 @@ def get_ai_judge_response_gemini(client, question, card_context):
     system_prompt = (
         f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
         "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
-        "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. " # <-- AANGEPAST
+        "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. "
         "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
         "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
         "Begin je antwoord direct met de uitspraak. "
@@ -1319,10 +1341,8 @@ def display_rules_judge_ui():
 
     # --- STATE INITIALISATIE (Met UNIEKE Keys) ---
     if "judge_messages" not in st.session_state:
-        st.session_state["judge_messages"] = [{
-            "role": "assistant", 
-            "content": f"Hallo! Mijn naam is **{ASSISTANT_NAME}**, {ASSISTANT_TITLE}. Ik help u graag met de complexe regels van ons mooie spel."
-        }]
+        # Start met lege chat, omdat de introductie nu in de banner staat
+        st.session_state["judge_messages"] = [] 
         st.session_state["judge_last_extracted_cards"] = set()
         st.session_state["judge_waiting_for_selection"] = False 
         st.session_state["judge_suggested_card_names"] = {} 
@@ -1393,14 +1413,48 @@ def display_rules_judge_ui():
 
     # --- STREAMLIT APP LAYOUT & LOGICA ---
 
-    st.title(f"⚖️ MTG-Rules: Vraag Judge {ASSISTANT_NAME}")
+    # --- BEGIN AANGEPASTE CSS VOOR AVATAR KLEUREN (GEFIXED) ---
+    USER_BG_COLOR = "#50C878"  # Green
+    ASSISTANT_BG_COLOR = "#9370DB" # Purple
+
+    custom_css = f"""
+    <style>
+    /* FIX: Target de directe DIV (de cirkel) binnen de data-testid container */
+    
+    /* User Avatar (Wizard with Green Background) */
+    [data-testid="stChatMessageAvatarUser"] > div {{
+        background-color: {USER_BG_COLOR} !important;
+    }}
+
+    /* Assistant Avatar (Bear with Purple Background) */
+    [data-testid="stChatMessageAvatarAssistant"] > div {{
+        background-color: {ASSISTANT_BG_COLOR} !important;
+    }}
+    </style>
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
+    # --- EINDE AANGEPASTE CSS ---
+
+    # --- JUDGE BANNER (AANGEPAST) ---
+    col_img, col_title = st.columns([1, 6]) # Kleine kolom voor de afbeelding, grote voor de titel
+
+    with col_img:
+        # Gebruik de 'width' parameter om de afbeelding klein te houden
+        st.image("Ruxa.png", width=200)
+
+    with col_title:
+        st.header(f"U heeft een vraag?") 
+
+    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**,**{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel. Wat is uw vraag?"
+    st.markdown(f"*{intro_text}*")
+    # --- EINDE JUDGE BANNER ---
     
     # --- CHAT GESCHIEDENIS TONEN ---
     for msg in st.session_state["judge_messages"]:
-        if msg["role"] == "assistant":
-            st.chat_message(msg["role"], avatar=ASSISTANT_EMOJI).write(msg["content"])
-        else:
-            st.chat_message(msg["role"]).write(msg["content"])
+        # Gebruik de juiste emoji voor de avatar, nu expliciet voor beide rollen
+        avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
+        st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
+
 
     # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
 
@@ -1430,12 +1484,25 @@ def display_rules_judge_ui():
             
         st.stop() 
 
+    col_clear, col_spacer = st.columns([1, 10]) 
+
+    with col_clear:
+        # Toon de knop enkel als er berichten zijn om te wissen
+        if st.session_state.get("judge_messages"):
+            st.button(
+                "🗑️", 
+                on_click=clear_judge_chat_history, 
+                help="Verwijder chatgeschiedenis", # Handige tooltip
+                key="clear_chat_icon"
+            )
+
     # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
 
     if user_query := st.chat_input("Uw regelvraag...", key="judge_chat_input"): 
         
         st.session_state["judge_messages"].append({"role": "user", "content": user_query})
-        st.chat_message("user").write(user_query)
+        # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
+        st.chat_message("user", avatar=USER_AVATAR_EMOJI).write(user_query)
 
         st.session_state["judge_original_query_pending"] = user_query
         
@@ -1449,16 +1516,8 @@ def display_rules_judge_ui():
             _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
             
         else:
-            st.rerun() 
+            st.rerun()
             
-# ------------------ Active Toggle Render ------------------
-def render_active_toggle_results():
-    """Render alleen de actieve toggle in hoofdapp"""
-
-    # --------- ⚖️ JUDGE RUXA Toggle --------
-    if st.session_state.get("judge_active"):
-        display_rules_judge_ui()
-
     # --------- 🔍 SET SEARCH Toggle --------
     elif st.session_state.get("zoekset_active", False):
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
