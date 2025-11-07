@@ -1125,6 +1125,14 @@ def render_active_toggle_results():
         display_sound_magic_ui()
 
 
+# Importeer benodigde modules
+import streamlit as st
+import requests
+from google import genai
+from google.genai import types 
+import re 
+import html # Nodig voor het opschonen van HTML-karakters
+
 # --------- ⚖️ JUDGE RUXA Toggle --------
 def display_rules_judge_ui():
     
@@ -1205,12 +1213,15 @@ def display_rules_judge_ui():
         
         st.session_state["judge_waiting_for_selection"] = False # Reset status
         
-        card_context = ""
+        # We hebben nu de gesplitste context nodig: een voor Gemini (met symbolen) en een voor de gebruiker (met HTML)
+        gemini_card_context = ""
+        user_html_context = ""
         extracted_cards_list = []
         
         for name in final_card_set:
-            actual_name, context = fetch_card_context_by_name(name)
-            card_context += context + "\n"
+            actual_name, gemini_context, user_html = fetch_card_context_by_name(name)
+            gemini_card_context += gemini_context + "\n"
+            user_html_context += user_html + "\n"
             extracted_cards_list.append(actual_name)
         
         user_query = st.session_state.pop("judge_original_query_pending")
@@ -1225,13 +1236,19 @@ def display_rules_judge_ui():
                 
                 if extracted_cards_list:
                     st.markdown("---")
-                    st.markdown(f"**Kaart Context Gebruikt:** {', '.join(set(extracted_cards_list))}") 
+                    st.markdown(f"**Kaart Context Gebruikt:**", unsafe_allow_html=True)
+                    # Toon de kaart context met symbolen aan de gebruiker
+                    st.markdown(user_html_context, unsafe_allow_html=True) 
+                    st.markdown("---")
                 
-                # Gebruik de globale Gemini wrapper
-                judge_response = get_ai_judge_response_gemini(client, user_query, card_context)
+                # Gebruik de context voor Gemini met de symbolen erin
+                judge_response_html = get_ai_judge_response_gemini(client, user_query, gemini_card_context)
                 
-                st.write(judge_response)
-                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response})
+                # Toon de uiteindelijke ruling, nu met symbolen erin
+                st.markdown(judge_response_html, unsafe_allow_html=True)
+                
+                # De 'html' output slaan we op in de messages, zodat we het later correct kunnen weergeven
+                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response_html})
                 
         st.rerun() 
         st.stop()
@@ -1255,7 +1272,15 @@ def display_rules_judge_ui():
     # --- CHAT GESCHIEDENIS TONEN ---
     for msg in st.session_state["judge_messages"]:
         avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
-        st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
+        
+        with st.chat_message(msg["role"], avatar=avatar_to_use):
+            content = msg["content"]
+            
+            # ** FIX: We moeten de opgeslagen HTML (met SVG-tags) correct decoderen **
+            if msg["role"] == "assistant":
+                content = html.unescape(content)
+            
+            st.markdown(content, unsafe_allow_html=True)
 
 
     # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
@@ -1332,45 +1357,91 @@ USER_AVATAR_EMOJI = "🧙"
 
 # --- HELPER FUNCTIES ---
 
+def get_svg_tag(symbol_code, size='1.2em'):
+    """ Genereert de HTML <img> tag voor een Scryfall SVG-symbool. """
+    BASE_SVG_URL = "https://svgs.scryfall.io/card-symbols/"
+    
+    symbol_code_content = symbol_code.strip('{}')
+    symbol_filename = symbol_code_content
+    
+    if '/' in symbol_filename:
+        symbol_filename = symbol_filename.replace('/', '') 
+    
+    if symbol_filename.startswith('ext'):
+        symbol_filename = symbol_filename.replace('ext', '')
+        
+    url = f"{BASE_SVG_URL}{symbol_filename}.svg"
+    
+    return f'<img src="{url}" style="width:{size}; height:{size}; vertical-align:middle; margin:0 1px;" alt="{symbol_code_content}">'
+
+def _post_process_ruling_with_svg(ruling_text):
+    """ Zoekt en vervangt alle Magic symbolen in de Ruling door SVG HTML-tags. """
+    
+    ruling_text = ruling_text.strip()
+    
+    # Zoek alle symbol codes {W}, {U}, {2}, {T}, etc.
+    found_codes_content = re.findall(r'\{([0-9A-Z/Pext]+)\}', ruling_text)
+    
+    for code_content in set(found_codes_content):
+        scryfall_code = '{' + code_content + '}'
+        svg_html = get_svg_tag(scryfall_code)
+        
+        # Vervang de code door de HTML tag.
+        ruling_text = ruling_text.replace(scryfall_code, svg_html)
+        
+    # We moeten de HTML escapen voordat we het opslaan in session_state, anders breekt Streamlit
+    return html.escape(ruling_text)
+
 def _format_card_context(data):
-    """ Formatteert alle metadata en oracle text in een leesbare context string. """
-    oracle_text = data.get('oracle_text', 'Geen regels tekst gevonden.')
+    """ Formatteert alle metadata en oracle text. Geeft een TUPLE terug: (gemini_text, user_html) """
     
-    # 1. Color Identity
-    color_identity_list = data.get('color_identity', [])
-    if color_identity_list:
-        color_map = {'W': 'Wit', 'U': 'Blauw', 'B': 'Zwart', 'R': 'Rood', 'G': 'Groen'}
-        colors = [color_map[c] for c in color_identity_list if c in color_map]
-        color_id_str = f"Color Identity: {', '.join(colors)}"
-    else:
-        color_id_str = "Color Identity: Kleurloos"
-        
-    # 2. Type Line, Mana Value, P/T
-    type_line = data.get('type_line', 'Type: Onbekend')
-    cmc = data.get('cmc')
-    cmc_str = f"Mana Value (CMC): {int(cmc)}" if cmc is not None else "Mana Value: Onbekend"
-    pt_str = ""
-    if 'power' in data and 'toughness' in data:
-        pt_str = f"Power/Toughness: {data['power']}/{data['toughness']}"
-        
-    metadata_block = f"{type_line} | {cmc_str} | {pt_str}".strip(' |')
+    raw_oracle_text = data.get('oracle_text', 'Geen regels tekst gevonden.')
+    raw_mana_cost = data.get('mana_cost', '')
     
-    context_text = (
+    # 1. Vind alle symbolen in de tekst en kosten
+    combined_raw_text = raw_mana_cost + ' ' + raw_oracle_text
+    found_codes = re.findall(r'\{([0-9A-Z/Pext]+)\}', combined_raw_text)
+    
+    html_oracle_text = raw_oracle_text
+    html_mana_cost = raw_mana_cost
+
+    # 2. Vervang de codes door HTML-afbeeldingen voor de gebruikersweergave (user_html)
+    for code in set(found_codes):
+        scryfall_code = '{' + code + '}'
+        svg_html = get_svg_tag(scryfall_code)
+        html_oracle_text = html_oracle_text.replace(scryfall_code, svg_html)
+        html_mana_cost = html_mana_cost.replace(scryfall_code, svg_html)
+    
+    # De gemini_text behoudt de {CODE}-syntax zodat de AI deze kan hergebruiken
+    gemini_text = (
         f"**Kaart: {data['name']}**\n"
-        f"**Metadata:** {metadata_block}\n"
-        f"{color_id_str}\n"
-        f"**Regeltekst:** {oracle_text}\n"
+        f"**Metadata:** Mana Cost: {raw_mana_cost} (CMC: {int(data.get('cmc', 0))}) | Type: {data.get('type_line', 'Onbekend')} | P/T: {data.get('power', '')}/{data.get('toughness', '')}\n"
+        f"Color Identity: {{{'}{'.join(data.get('color_identity', []))}}}\n"
+        f"**Regeltekst (met symbolen):** {raw_oracle_text}\n"
     )
-    return context_text
+    
+    # Metadata voor de gebruiker (met HTML)
+    color_symbols_html = [get_svg_tag('{' + c + '}', size='1.5em') for c in data.get('color_identity', [])]
+    html_color_id_str = f"Color Identity: {' '.join(color_symbols_html)}" if color_symbols_html else "Color Identity: Kleurloos"
+    
+    cmc_str_html = f"Mana Cost: {html_mana_cost} (CMC: {int(data.get('cmc', 0))})"
+    metadata_block_html = f"{data.get('type_line', 'Type: Onbekend')} | {cmc_str_html} | P/T: {data.get('power', '')}/{data.get('toughness', '')}"
+    
+    user_html = (
+        f"**Kaart: {data['name']}**\n"
+        f"**Metadata:** {metadata_block_html.strip(' |')}\n"
+        f"{html_color_id_str}\n"
+        f"**Regeltekst:** {html_oracle_text}\n"
+    )
+    
+    return gemini_text, user_html
 
 def clear_judge_chat_history():
     """Verwijdert de chatgeschiedenis en gerelateerde statusvariabelen."""
     
-    # Maak de lijst met berichten leeg
     if "judge_messages" in st.session_state:
         st.session_state["judge_messages"] = []
         
-    # Wis gerelateerde statusvariabelen voor een schone start
     st.session_state.pop("judge_original_query_pending", None) 
     st.session_state.pop("judge_last_extracted_cards", None)
     
@@ -1378,15 +1449,19 @@ def clear_judge_chat_history():
 
 @st.cache_data(ttl=3600)
 def fetch_card_context_by_name(card_name):
-    """ Haalt ALLE context op voor een BEVESTIGDE kaartnaam (gebruikt exacte match). """
+    """ Haalt context op en splitst deze in Gemini-text (met codes) en User-HTML (met SVG's). """
     base_url = "https://api.scryfall.com/cards/named"
     try:
         response = requests.get(base_url, params={'exact': card_name}) 
         response.raise_for_status() 
         data = response.json()
-        return data['name'], _format_card_context(data)
+        
+        gemini_context, user_html = _format_card_context(data)
+        
+        return data['name'], gemini_context, user_html
     except requests.exceptions.RequestException:
-        return card_name, f"**Kaart: {card_name}**\n*Kon kaartdata niet vinden of ophalen.*\n"
+        error_context = f"**Kaart: {card_name}**\n*Kon kaartdata niet vinden of ophalen.*\n"
+        return card_name, error_context, error_context
 
 
 @st.cache_data(ttl=3600)
@@ -1430,13 +1505,15 @@ def extract_card_names_gemini(client, user_query):
         st.error(f"Fout bij het extraheren van kaartnamen: {e}")
         return []
 
-# Nieuwe code
 def get_ai_judge_response_gemini(client, question, card_context):
     MODEL_NAME = 'gemini-2.5-flash'
     system_prompt = (
         f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
         "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
         "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. "
+        "Wanneer je Mana kosten, Abilities of Color Identity noemt, **gebruik dan uitsluitend de Scryfall-codes** "
+        "(`{W}`, `{T}`, `{2}`, etc.) op de plek van de kleur/kosten, **zonder voorafgaande of volgende tekstuele beschrijving** "
+        "van de kleuren (zoals 'blauw' of 'zwart'). De symbolen zijn de beschrijving. "
         "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
         "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
         "Begin je antwoord direct met de uitspraak. "
@@ -1456,7 +1533,12 @@ def get_ai_judge_response_gemini(client, question, card_context):
                 system_instruction=system_prompt
             )
         )
-        return response.text.strip()
+        raw_ruling = response.text.strip()
+        
+        # Post-process de ruling om de symbolen om te zetten in HTML SVG's en escape de output.
+        final_ruling_html = _post_process_ruling_with_svg(raw_ruling)
+        
+        return final_ruling_html
     
     except Exception as e:
         return f"Er is een fout opgetreden bij de Gemini API: {e}"
