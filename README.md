@@ -1,4 +1,4 @@
-#CommanderDeckDoctor
+## 🐻 CommanderDeckDoctor
 
 Een app voor Magic: The Gathering Commander-spelers.  
 De app helpt om snel nieuwe kaarten te vinden voor bestaande decks.
