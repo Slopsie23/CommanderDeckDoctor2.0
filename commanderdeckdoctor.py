@@ -51,12 +51,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-def _post_process_ruling_with_svg(ruling_text):
-    # DIT IS EEN TEST:
-    test_html = "<h2>TEST: HTML WERKT!</h2>" + ruling_text.replace('{W}', '<span style="color:white; background-color: black;">[W]</span>')
-    return html.escape(test_html) 
-    # EINDE TEST
-    # ... de rest van uw oorspronkelijke code
 # ------------------ Logging ------------------
 logging.basicConfig(
     level=logging.WARNING,
@@ -1547,7 +1541,14 @@ def get_ai_judge_response_gemini(client, question, card_context):
     
     except Exception as e:
         return f"Er is een fout opgetreden bij de Gemini API: {e}"
-            
+
+def _post_process_ruling_with_svg(ruling_text):
+    # DIT IS EEN TEST:
+    test_html = "<h2>TEST: HTML WERKT!</h2>" + ruling_text.replace('{W}', '<span style="color:white; background-color: black;">[W]</span>')
+    return html.escape(test_html) 
+    # EINDE TEST
+    # ... de rest van uw oorspronkelijke code   
+	
 # --------- 🔍 SET SEARCH Toggle --------
 def display_set_search_ui():
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
