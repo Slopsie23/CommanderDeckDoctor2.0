@@ -12,7 +12,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 import html
-import base64
+
 
 # Streamlit
 import streamlit as st
