@@ -1169,7 +1169,7 @@ def sidebar_toggle_expander():
 
 
 # ==========================================================
-# JUDGE APP CODE BLOCK (Alles bij elkaar)
+# JUDGE RUXA
 # ==========================================================
 
 # --- CONFIGURATIE ---
@@ -1271,9 +1271,10 @@ def get_ai_judge_response_gemini(client, question, card_context):
     system_prompt = (
         f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
         "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
+        "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. " # <-- AANGEPAST
         "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
         "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
-        "Gebruik Nederlandse taal en begin je antwoord direct met de uitspraak. "
+        "Begin je antwoord direct met de uitspraak. "
         "Als de kaarten niet relevant zijn of missen, vermeld dit kort."
     )
     user_message = (
@@ -1405,7 +1406,7 @@ def display_rules_judge_ui():
 
     if st.session_state["judge_waiting_for_selection"]:
         
-        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: Gelieve de bedoelde kaart(en) te selecteren:")
+        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: selecteer je bedoelde kaart(en):")
         
         selected_confirmed_cards = st.session_state["judge_last_extracted_cards"].copy()
         
@@ -1431,7 +1432,7 @@ def display_rules_judge_ui():
 
     # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
 
-    if user_query := st.chat_input("Uw regelsvraag...", key="judge_chat_input"): 
+    if user_query := st.chat_input("Uw regelvraag...", key="judge_chat_input"): 
         
         st.session_state["judge_messages"].append({"role": "user", "content": user_query})
         st.chat_message("user").write(user_query)
@@ -1450,11 +1451,6 @@ def display_rules_judge_ui():
         else:
             st.rerun() 
             
-# ==========================================================
-# EINDE JUDGE APP CODE BLOCK
-# ==========================================================
-
-
 # ------------------ Active Toggle Render ------------------
 def render_active_toggle_results():
     """Render alleen de actieve toggle in hoofdapp"""
