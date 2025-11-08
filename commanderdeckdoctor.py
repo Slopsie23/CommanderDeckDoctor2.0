@@ -11,8 +11,6 @@ import tempfile
 from pathlib import Path
 from google import genai
 from google.genai import types
-import html
-
 
 # Streamlit
 import streamlit as st
@@ -1126,229 +1124,10 @@ def render_active_toggle_results():
         display_sound_magic_ui()
 
 
-# Importeer benodigde modules
-import streamlit as st
-import requests
-from google import genai
-from google.genai import types 
-import re 
-import html # Nodig voor het opschonen van HTML-karakters
 
 # --------- ⚖️ JUDGE RUXA Toggle --------
 def display_rules_judge_ui():
-    
-    # --- CLIENT INITIALISATIE ---
-    client = None
-    try:
-        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except (FileNotFoundError, KeyError):
-        st.error(f"⚠️ Fout: Gemini API Key niet gevonden in st.secrets.")
-        st.caption("Voer de sleutel in of sla deze op in '.streamlit/secrets.toml'.")
-        GEMINI_API_KEY = st.text_input("Voer uw Gemini API Key in:")
-        if GEMINI_API_KEY:
-            client = genai.Client(api_key=GEMINI_API_KEY)
-        else:
-            st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
-            return
-
-    # --- STATE INITIALISATIE ---
-    if "judge_messages" not in st.session_state:
-        # Start met lege chat, omdat de introductie nu in de banner staat
-        st.session_state["judge_messages"] = [] 
-        st.session_state["judge_last_extracted_cards"] = set()
-        st.session_state["judge_waiting_for_selection"] = False 
-        st.session_state["judge_suggested_card_names"] = {} 
-        st.session_state["judge_original_query_pending"] = None 
-        
-    # --- Interne helper functies met state logica ---
-
-    def _process_card_names(extracted_card_names):
-        """ 
-        Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. 
-        FIX: Controleer alleen de NIEUW geëxtraheerde kaarten op onzekerheid.
-        """
-        
-        current_card_set = st.session_state["judge_last_extracted_cards"]
-        
-        new_suggestions = {}
-        confirmed_new_cards = set()
-        
-        # We controleren ALLEEN de nieuwe namen uit de AI-output
-        for name in extracted_card_names:
-            try:
-                # Probeer de kaart exact te vinden
-                response = requests.get(f"https://api.scryfall.com/cards/named?exact={name}")
-                
-                if response.status_code == 200:
-                    # Kaart exact gevonden
-                    confirmed_new_cards.add(name)
-                else:
-                    # Exacte kaart niet gevonden, zoek naar suggesties
-                    suggestions = get_card_suggestions(name)
-                    
-                    if suggestions:
-                        new_suggestions[name] = suggestions
-                        
-            except Exception:
-                continue
-                
-        # Update de algemene set met de nieuw bevestigde kaarten (zodat we ze niet opnieuw controleren)
-        st.session_state["judge_last_extracted_cards"] = current_card_set.union(confirmed_new_cards)
-        
-        if new_suggestions:
-            st.session_state["judge_waiting_for_selection"] = True
-            st.session_state["judge_suggested_card_names"] = new_suggestions
-            return False, new_suggestions
-            
-        # Geen suggesties nodig
-        return True, st.session_state["judge_last_extracted_cards"]
-
-
-    def _continue_processing_after_selection(confirmed_cards):
-        """ Voert de Judge-analyse uit nadat de gebruiker de kaartnamen heeft geselecteerd. """
-        
-        # Zorg ervoor dat de set van eerder bevestigde kaarten meegaat
-        final_card_set = st.session_state["judge_last_extracted_cards"].union(set(confirmed_cards))
-        st.session_state["judge_last_extracted_cards"] = final_card_set
-        
-        st.session_state["judge_waiting_for_selection"] = False # Reset status
-        
-        # We hebben nu de gesplitste context nodig: een voor Gemini (met symbolen) en een voor de gebruiker (met HTML)
-        gemini_card_context = ""
-        user_html_context = ""
-        extracted_cards_list = []
-        
-        for name in final_card_set:
-            actual_name, gemini_context, user_html = fetch_card_context_by_name(name)
-            gemini_card_context += gemini_context + "\n"
-            user_html_context += user_html + "\n"
-            extracted_cards_list.append(actual_name)
-        
-        user_query = st.session_state.pop("judge_original_query_pending")
-
-        extracted_message = f"gevonden Kaart(en): {', '.join(extracted_cards_list) if extracted_cards_list else 'Geen kaarten gevonden.'}"
-        st.session_state["judge_messages"].append({"role": "assistant", "content": extracted_message})
-        
-        st.chat_message("assistant", avatar=ASSISTANT_EMOJI).write(extracted_message)
-
-        with st.chat_message("assistant", avatar=ASSISTANT_EMOJI):
-            with st.spinner(f"🐻 De {ASSISTANT_TITLE} formuleert de definitieve uitspraak..."):
-                
-                if extracted_cards_list:
-                    st.markdown("---")
-                    st.markdown(f"**Kaart Context Gebruikt:**", unsafe_allow_html=True)
-                    # Toon de kaart context met symbolen aan de gebruiker
-                    st.markdown(user_html_context, unsafe_allow_html=True) 
-                    st.markdown("---")
-                
-                # Gebruik de context voor Gemini met de symbolen erin
-                judge_response_html = get_ai_judge_response_gemini(client, user_query, gemini_card_context)
-                
-                # Toon de uiteindelijke ruling, nu met symbolen erin
-                st.markdown(judge_response_html, unsafe_allow_html=True)
-                
-                # De 'html' output slaan we op in de messages, zodat we het later correct kunnen weergeven
-                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response_html})
-                
-        st.rerun() 
-        st.stop()
-        
-
-    # --- LAYOUT & LOGICA ---
-
-
-    # --- JUDGE BANNER ---
-    col_img, col_title = st.columns([1, 6]) 
-
-    with col_img:
-        st.image("Ruxa.png", width=200) 
-
-    with col_title:
-        st.header(f"U heeft een vraag?") 
-
-    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**, **{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel."
-    st.markdown(f"{intro_text}")
-    
-    # --- CHAT GESCHIEDENIS TONEN ---
-    for msg in st.session_state["judge_messages"]:
-        avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
-        
-        with st.chat_message(msg["role"], avatar=avatar_to_use):
-            content = msg["content"]
-            
-            # ** FIX: We moeten de opgeslagen HTML (met SVG-tags) correct decoderen **
-            if msg["role"] == "assistant":
-                content = html.unescape(content)
-            
-            st.markdown(content, unsafe_allow_html=True)
-
-
-    # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
-
-    if st.session_state["judge_waiting_for_selection"]:
-        
-        st.warning(f"Welke kaart bedoel je?")
-        
-        # De suggestie-UI toont nu alleen de onzekere kaarten uit de nieuwe suggesties
-        selected_confirmed_cards = set()
-        
-        for original_term, suggestions in st.session_state["judge_suggested_card_names"].items():
-            
-            options = suggestions + [f"Geen van deze (Negeer '{original_term}')"]
-            
-            chosen_card = st.selectbox(
-                f"Bedoelde u met '_{original_term}_' de kaart:",
-                options,
-                key=f"judge_select_{original_term}" 
-            )
-            
-            if f"Geen van deze" not in chosen_card:
-                selected_confirmed_cards.add(chosen_card)
-
-        if st.button(f"Bevestig je selectie voor de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
-            st.session_state["judge_waiting_for_selection"] = False
-            st.session_state["judge_suggested_card_names"] = {}
-            _continue_processing_after_selection(selected_confirmed_cards)
-            
-        st.stop() 
-
-    col_clear, col_spacer = st.columns([1, 10]) 
-
-    with col_clear:
-        # Toon de knop enkel als er berichten zijn om te wissen
-        if st.session_state.get("judge_messages"):
-            st.button(
-                "🗑️", 
-                on_click=clear_judge_chat_history, 
-                help="Verwijder chatgeschiedenis", # Handige tooltip
-                key="clear_chat_icon"
-            )
-
-    # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
-
-    if user_query := st.chat_input("Wat is uw vraag?", key="judge_chat_input"): 
-        
-        st.session_state["judge_messages"].append({"role": "user", "content": user_query})
-        # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
-        st.chat_message("user", avatar=USER_AVATAR_EMOJI).write(user_query)
-
-        st.session_state["judge_original_query_pending"] = user_query
-        
-        with st.spinner(f"🐻 {ASSISTANT_NAME} zoekt naar kaartnamen..."):
-            # Gebruik de globale Gemini wrapper
-            newly_extracted_cards = extract_card_names_gemini(client, user_query)
-        
-        # Gebruik de bijgewerkte logica
-        is_clear, data = _process_card_names(newly_extracted_cards)
-        
-        if is_clear:
-            # Als alles duidelijk is, ga direct door
-            _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
-            
-        else:
-            # Anders, toon de selectie-UI
-            st.rerun()
+    st.write("⚖️ Judge Ruxa UI content placeholder")
 
 # --- CONFIGURATIE ---
 ASSISTANT_NAME = "Ruxa"
@@ -1358,122 +1137,45 @@ USER_AVATAR_EMOJI = "🧙"
 
 # --- HELPER FUNCTIES ---
 
-# NIEUWE HULPFUNCTIE: Cachet de SVG-data lokaal
-@st.cache_data(ttl=60 * 60 * 24 * 7) # Cache 1 week
-def fetch_mana_svg_as_base64(symbol_code_content):
-    """ Haalt de SVG op van Scryfall en converteert deze naar een Base64 Data URI. """
-    BASE_SVG_URL = "https://svgs.scryfall.io/card-symbols/"
-    
-    symbol_filename = symbol_code_content
-    if '/' in symbol_filename:
-        symbol_filename = symbol_filename.replace('/', '') 
-    if symbol_filename.startswith('ext'):
-        symbol_filename = symbol_filename.replace('ext', '')
-
-    url = f"{BASE_SVG_URL}{symbol_filename}.svg"
-    
-    try:
-        # We gebruiken requests om de SVG data op te halen (deze stap werkt blijkbaar)
-        response = requests.get(url, timeout=5)
-        response.raise_for_status()
-        
-        # De SVG-data direct inlezen
-        svg_content = response.text
-        
-        # Gebruik een Base64-versie om de SVG inline te maken
-        import base64
-        encoded = base64.b64encode(svg_content.encode('utf-8')).decode('utf-8')
-        
-        # We sturen de Base64 data URI terug
-        return f"data:image/svg+xml;base64,{encoded}"
-
-    except Exception:
-        # Fallback in geval van fout
-        return f"ERROR"
-
-
-def get_svg_tag(symbol_code, size='1.2em'):
-    """ Genereert de HTML <img> tag met de Base64 Data URI. """
-    symbol_code_content = symbol_code.strip('{}')
-    
-    # Haal de Base64 URI op uit de cache
-    data_uri = fetch_mana_svg_as_base64(symbol_code_content)
-    
-    if data_uri == "ERROR":
-        # Valideer met een fallback-tekst
-        return f'<span style="border:1px solid #777; padding:0 2px; border-radius:3px; background:#ddd; font-size:{size}; line-height:{size};">{symbol_code_content}</span>'
-    
-    # Gebruik de Base64 URI in de src-attribuut
-    return f'<img src="{data_uri}" style="width:{size}; height:{size}; vertical-align:middle; margin:0 1px;" alt="{symbol_code_content}">'
-
-def _post_process_ruling_with_svg(ruling_text):
-    """ Zoekt en vervangt alle Magic symbolen in de Ruling door SVG HTML-tags. """
-    
-    ruling_text = ruling_text.strip()
-    
-    # Zoek alle symbol codes {W}, {U}, {2}, {T}, etc.
-    found_codes_content = re.findall(r'\{([0-9A-Z/Pext]+)\}', ruling_text)
-    
-    for code_content in set(found_codes_content):
-        scryfall_code = '{' + code_content + '}'
-        svg_html = get_svg_tag(scryfall_code)
-        
-        # Vervang de code door de HTML tag.
-        ruling_text = ruling_text.replace(scryfall_code, svg_html)
-        
-    # We moeten de HTML escapen voordat we het opslaan in session_state, anders breekt Streamlit
-    return html.escape(ruling_text)
-
 def _format_card_context(data):
-    """ Formatteert alle metadata en oracle text. Geeft een TUPLE terug: (gemini_text, user_html) """
+    """ Formatteert alle metadata en oracle text in een leesbare context string. """
+    oracle_text = data.get('oracle_text', 'Geen regels tekst gevonden.')
     
-    raw_oracle_text = data.get('oracle_text', 'Geen regels tekst gevonden.')
-    raw_mana_cost = data.get('mana_cost', '')
+    # 1. Color Identity
+    color_identity_list = data.get('color_identity', [])
+    if color_identity_list:
+        color_map = {'W': 'Wit', 'U': 'Blauw', 'B': 'Zwart', 'R': 'Rood', 'G': 'Groen'}
+        colors = [color_map[c] for c in color_identity_list if c in color_map]
+        color_id_str = f"Color Identity: {', '.join(colors)}"
+    else:
+        color_id_str = "Color Identity: Kleurloos"
+        
+    # 2. Type Line, Mana Value, P/T
+    type_line = data.get('type_line', 'Type: Onbekend')
+    cmc = data.get('cmc')
+    cmc_str = f"Mana Value (CMC): {int(cmc)}" if cmc is not None else "Mana Value: Onbekend"
+    pt_str = ""
+    if 'power' in data and 'toughness' in data:
+        pt_str = f"Power/Toughness: {data['power']}/{data['toughness']}"
+        
+    metadata_block = f"{type_line} | {cmc_str} | {pt_str}".strip(' |')
     
-    # 1. Vind alle symbolen in de tekst en kosten
-    combined_raw_text = raw_mana_cost + ' ' + raw_oracle_text
-    found_codes = re.findall(r'\{([0-9A-Z/Pext]+)\}', combined_raw_text)
-    
-    html_oracle_text = raw_oracle_text
-    html_mana_cost = raw_mana_cost
-
-    # 2. Vervang de codes door HTML-afbeeldingen voor de gebruikersweergave (user_html)
-    for code in set(found_codes):
-        scryfall_code = '{' + code + '}'
-        svg_html = get_svg_tag(scryfall_code)
-        html_oracle_text = html_oracle_text.replace(scryfall_code, svg_html)
-        html_mana_cost = html_mana_cost.replace(scryfall_code, svg_html)
-    
-    # De gemini_text behoudt de {CODE}-syntax zodat de AI deze kan hergebruiken
-    gemini_text = (
+    context_text = (
         f"**Kaart: {data['name']}**\n"
-        f"**Metadata:** Mana Cost: {raw_mana_cost} (CMC: {int(data.get('cmc', 0))}) | Type: {data.get('type_line', 'Onbekend')} | P/T: {data.get('power', '')}/{data.get('toughness', '')}\n"
-        f"Color Identity: {{{'}{'.join(data.get('color_identity', []))}}}\n"
-        f"**Regeltekst (met symbolen):** {raw_oracle_text}\n"
+        f"**Metadata:** {metadata_block}\n"
+        f"{color_id_str}\n"
+        f"**Regeltekst:** {oracle_text}\n"
     )
-    
-    # Metadata voor de gebruiker (met HTML)
-    color_symbols_html = [get_svg_tag('{' + c + '}', size='1.5em') for c in data.get('color_identity', [])]
-    html_color_id_str = f"Color Identity: {' '.join(color_symbols_html)}" if color_symbols_html else "Color Identity: Kleurloos"
-    
-    cmc_str_html = f"Mana Cost: {html_mana_cost} (CMC: {int(data.get('cmc', 0))})"
-    metadata_block_html = f"{data.get('type_line', 'Type: Onbekend')} | {cmc_str_html} | P/T: {data.get('power', '')}/{data.get('toughness', '')}"
-    
-    user_html = (
-        f"**Kaart: {data['name']}**\n"
-        f"**Metadata:** {metadata_block_html.strip(' |')}\n"
-        f"{html_color_id_str}\n"
-        f"**Regeltekst:** {html_oracle_text}\n"
-    )
-    
-    return gemini_text, user_html
+    return context_text
 
 def clear_judge_chat_history():
     """Verwijdert de chatgeschiedenis en gerelateerde statusvariabelen."""
     
+    # Maak de lijst met berichten leeg
     if "judge_messages" in st.session_state:
         st.session_state["judge_messages"] = []
         
+    # Wis gerelateerde statusvariabelen voor een schone start
     st.session_state.pop("judge_original_query_pending", None) 
     st.session_state.pop("judge_last_extracted_cards", None)
     
@@ -1481,19 +1183,15 @@ def clear_judge_chat_history():
 
 @st.cache_data(ttl=3600)
 def fetch_card_context_by_name(card_name):
-    """ Haalt context op en splitst deze in Gemini-text (met codes) en User-HTML (met SVG's). """
+    """ Haalt ALLE context op voor een BEVESTIGDE kaartnaam (gebruikt exacte match). """
     base_url = "https://api.scryfall.com/cards/named"
     try:
         response = requests.get(base_url, params={'exact': card_name}) 
         response.raise_for_status() 
         data = response.json()
-        
-        gemini_context, user_html = _format_card_context(data)
-        
-        return data['name'], gemini_context, user_html
+        return data['name'], _format_card_context(data)
     except requests.exceptions.RequestException:
-        error_context = f"**Kaart: {card_name}**\n*Kon kaartdata niet vinden of ophalen.*\n"
-        return card_name, error_context, error_context
+        return card_name, f"**Kaart: {card_name}**\n*Kon kaartdata niet vinden of ophalen.*\n"
 
 
 @st.cache_data(ttl=3600)
@@ -1530,7 +1228,6 @@ def extract_card_names_gemini(client, user_query):
         )
         if response.text is None:
              return []
-        # Schoon de output op in het geval de AI toch extra tekst toevoegt (CSV parsing)
         card_names = [name.strip() for name in response.text.split(',') if name.strip()]
         return card_names
     except Exception as e:
@@ -1538,14 +1235,12 @@ def extract_card_names_gemini(client, user_query):
         return []
 
 def get_ai_judge_response_gemini(client, question, card_context):
+    """ Stuurt de vraag en de geassembleerde context naar Gemini Flash. """
     MODEL_NAME = 'gemini-2.5-flash'
     system_prompt = (
         f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
         "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
         "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. "
-        "Wanneer je Mana kosten, Abilities of Color Identity noemt, **gebruik dan uitsluitend de Scryfall-codes** "
-        "(`{W}`, `{T}`, `{2}`, etc.) op de plek van de kleur/kosten, **zonder voorafgaande of volgende tekstuele beschrijving** "
-        "van de kleuren (zoals 'blauw' of 'zwart'). De symbolen zijn de beschrijving. "
         "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
         "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
         "Begin je antwoord direct met de uitspraak. "
@@ -1554,7 +1249,7 @@ def get_ai_judge_response_gemini(client, question, card_context):
     user_message = (
         f"--- CONTEXT VAN KAARTEN (INCL. METADATA) ---\n{card_context}\n"
         f"--- REGELSVRAAG ---\n{question}\n\n"
-        "**Wat is de Ruling (Uitspraak in het Nederlands)?**" 
+        "Wat is de Ruling van de Professor? (Uitspraak in het Nederlands):"
     )
 
     try:
@@ -1565,15 +1260,186 @@ def get_ai_judge_response_gemini(client, question, card_context):
                 system_instruction=system_prompt
             )
         )
-        raw_ruling = response.text.strip()
-        
-        # Post-process de ruling om de symbolen om te zetten in HTML SVG's en escape de output.
-        final_ruling_html = _post_process_ruling_with_svg(raw_ruling)
-        
-        return final_ruling_html
+        return response.text.strip()
     
     except Exception as e:
         return f"Er is een fout opgetreden bij de Gemini API: {e}"
+
+
+# --- BELANGRIJKSTE JUDGE UI FUNCTIE ---
+
+def display_rules_judge_ui():
+    """ Toont de complete Ruxa Judge UI in de hoofdsectie van de Streamlit app. """
+    
+    # --- CLIENT INITIALISATIE ---
+    client = None
+    try:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except (FileNotFoundError, KeyError):
+        st.error(f"⚠️ Fout: Gemini API Key niet gevonden in st.secrets.")
+        st.caption("Voer de sleutel in of sla deze op in '.streamlit/secrets.toml'.")
+        GEMINI_API_KEY = st.text_input("Voer uw Gemini API Key in:")
+        if GEMINI_API_KEY:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+        else:
+            st.warning("Kan de Judge-functie niet starten zonder Gemini API Key.")
+            return
+
+    # --- STATE INITIALISATIE ---
+    if "judge_messages" not in st.session_state:
+        # Start met lege chat, omdat de introductie nu in de banner staat
+        st.session_state["judge_messages"] = [] 
+        st.session_state["judge_last_extracted_cards"] = set()
+        st.session_state["judge_waiting_for_selection"] = False 
+        st.session_state["judge_suggested_card_names"] = {} 
+        st.session_state["judge_original_query_pending"] = None 
+        
+    # --- Interne helper functies met state logica ---
+
+    def _process_card_names(extracted_card_names):
+        """ Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. """
+        current_card_set = st.session_state["judge_last_extracted_cards"].union(set(extracted_card_names))
+        
+        new_suggestions = {}
+        
+        for name in current_card_set:
+            try:
+                suggestions = get_card_suggestions(name)
+                response = requests.get(f"https://api.scryfall.com/cards/named?exact={name}")
+                if response.status_code != 200 and suggestions:
+                    new_suggestions[name] = suggestions
+            except Exception:
+                continue
+                
+        if new_suggestions:
+            st.session_state["judge_waiting_for_selection"] = True
+            st.session_state["judge_suggested_card_names"] = new_suggestions
+            return False, new_suggestions
+            
+        st.session_state["judge_last_extracted_cards"] = current_card_set
+        return True, current_card_set
+
+    def _continue_processing_after_selection(confirmed_cards):
+        """ Voert de Judge-analyse uit nadat de gebruiker de kaartnamen heeft geselecteerd. """
+        
+        final_card_set = st.session_state["judge_last_extracted_cards"].union(set(confirmed_cards))
+        st.session_state["judge_last_extracted_cards"] = final_card_set
+        
+        card_context = ""
+        extracted_cards_list = []
+        
+        for name in final_card_set:
+            actual_name, context = fetch_card_context_by_name(name)
+            card_context += context + "\n"
+            extracted_cards_list.append(actual_name)
+        
+        user_query = st.session_state.pop("judge_original_query_pending")
+
+        extracted_message = f"gevonden Kaart(en): {', '.join(extracted_cards_list) if extracted_cards_list else 'Geen kaarten gevonden.'}"
+        st.session_state["judge_messages"].append({"role": "assistant", "content": extracted_message})
+        
+        st.chat_message("assistant", avatar=ASSISTANT_EMOJI).write(extracted_message)
+
+        with st.chat_message("assistant", avatar=ASSISTANT_EMOJI):
+            with st.spinner(f"🐻 De {ASSISTANT_TITLE} formuleert de definitieve uitspraak..."):
+                
+                if extracted_cards_list:
+                    st.markdown("---")
+                    st.markdown(f"**Kaart Context Gebruikt:** {', '.join(set(extracted_cards_list))}") 
+                
+                # Gebruik de globale Gemini wrapper
+                judge_response = get_ai_judge_response_gemini(client, user_query, card_context)
+                
+                st.write(judge_response)
+                st.session_state["judge_messages"].append({"role": "assistant", "content": judge_response})
+                
+        st.rerun() 
+        st.stop()
+        
+
+    # --- LAYOUT & LOGICA ---
+
+
+    # --- JUDGE BANNER ---
+    col_img, col_title = st.columns([1, 6]) # Kleine kolom voor de afbeelding, grote voor de titel
+
+    with col_img:
+        st.image("Ruxa.png", width=200)
+
+    with col_title:
+        st.header(f"U heeft een vraag?") 
+
+    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**,**{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel. Wat is uw vraag?"
+    st.markdown(f"*{intro_text}*")
+    
+    # --- CHAT GESCHIEDENIS TONEN ---
+    for msg in st.session_state["judge_messages"]:
+        avatar_to_use = ASSISTANT_EMOJI if msg["role"] == "assistant" else USER_AVATAR_EMOJI
+        st.chat_message(msg["role"], avatar=avatar_to_use).write(msg["content"])
+
+
+    # --- HOOFD LOGICA: KAART SELECTIE UI (UITZONDERINGSGEVAL) ---
+
+    if st.session_state["judge_waiting_for_selection"]:
+        
+        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: selecteer je bedoelde kaart(en):")
+        
+        selected_confirmed_cards = st.session_state["judge_last_extracted_cards"].copy()
+        
+        for original_term, suggestions in st.session_state["judge_suggested_card_names"].items():
+            
+            options = suggestions + [f"Geen van deze (Negeer '{original_term}')"]
+            
+            chosen_card = st.selectbox(
+                f"Bedoelde u met '_{original_term}_' de kaart:",
+                options,
+                key=f"judge_select_{original_term}" 
+            )
+            
+            if f"Geen van deze" not in chosen_card:
+                selected_confirmed_cards.add(chosen_card)
+
+        if st.button(f"Bevestig Selectie en Vraag de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
+            st.session_state["judge_waiting_for_selection"] = False
+            st.session_state["judge_suggested_card_names"] = {}
+            _continue_processing_after_selection(selected_confirmed_cards)
+            
+        st.stop() 
+
+    col_clear, col_spacer = st.columns([1, 10]) 
+
+    with col_clear:
+        # Toon de knop enkel als er berichten zijn om te wissen
+        if st.session_state.get("judge_messages"):
+            st.button(
+                "🗑️", 
+                on_click=clear_judge_chat_history, 
+                help="Verwijder chatgeschiedenis", # Handige tooltip
+                key="clear_chat_icon"
+            )
+
+    # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
+
+    if user_query := st.chat_input("Uw regelvraag...", key="judge_chat_input"): 
+        
+        st.session_state["judge_messages"].append({"role": "user", "content": user_query})
+        # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
+        st.chat_message("user", avatar=USER_AVATAR_EMOJI).write(user_query)
+
+        st.session_state["judge_original_query_pending"] = user_query
+        
+        with st.spinner(f"🐻 {ASSISTANT_NAME} zoekt naar kaartnamen..."):
+            # Gebruik de globale Gemini wrapper
+            newly_extracted_cards = extract_card_names_gemini(client, user_query)
+        
+        is_clear, data = _process_card_names(newly_extracted_cards)
+        
+        if is_clear:
+            _continue_processing_after_selection(st.session_state["judge_last_extracted_cards"])
+            
+        else:
+            st.rerun()
             
 # --------- 🔍 SET SEARCH Toggle --------
 def display_set_search_ui():
