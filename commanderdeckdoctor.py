@@ -1124,7 +1124,6 @@ def render_active_toggle_results():
         display_sound_magic_ui()
 
 
-
 # --------- ⚖️ JUDGE RUXA Toggle --------
 def display_rules_judge_ui():
     st.write("⚖️ Judge Ruxa UI content placeholder")
@@ -1237,19 +1236,30 @@ def extract_card_names_gemini(client, user_query):
 def get_ai_judge_response_gemini(client, question, card_context):
     """ Stuurt de vraag en de geassembleerde context naar Gemini Flash. """
     MODEL_NAME = 'gemini-2.5-flash'
+    ASSISTANT_NAME = 'Master Judge 3' 
+
     system_prompt = (
-        f"Je bent een gespecialiseerde Magic: The Gathering {ASSISTANT_TITLE} met de naam {ASSISTANT_NAME}. Je bent de autoriteit op "
-        "het gebied van de Comprehensive Rules, de Color Identity regels van Commander en de Stack. "
-        "**BELANGRIJK:** Gebruik Nederlandse taal, maar behoud alle gangbare Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', etc.) in de **originele ENGELSE term**. "
-        "Beantwoord de gebruikersvraag kort, feitelijk en definitief, "
-        "uitsluitend gebaseerd op de gegeven kaartteksten en de *uitgebreide Metadata* (Type, CMC, P/T, Color ID). "
-        "Begin je antwoord direct met de uitspraak. "
-        "Als de kaarten niet relevant zijn of missen, vermeld dit kort."
+        f"Je bent een gespecialiseerde en zeer ervaren Magic: The Gathering **Level 3 (L3) Judge**, opererend onder de naam '{ASSISTANT_NAME}'. "
+        "Jouw kennis is die van een **Regional Coordinator**. Je bent de **ultieme autoriteit** op het gebied van de: "
+        "* **Comprehensive Rules (CR)** "
+        "* **Commander Format Rules**, inclusief de specifieke Multiplayer-regels, de Color Identity-regels, en de Commander Tax. "
+        "* **Layer System** voor Continuous Effects. "
+        "* De complete interactie van de **Stack**. "
+        
+        "Jouw rol is het geven van een **definitieve, onfeilbare Ruling** met de intelligentie en diepgang van een L3 Judge. "
+        
+        "**STRIKT TE VOLGEN REGELS:** "
+        "* **Taal & Jargon:** Gebruik Nederlandse taal, maar behoud **ALLE** Magic: The Gathering JARGON (zoals 'Power', 'Toughness', 'Stack', 'Battlefield', 'Graveyard', 'Ability', 'Exile', 'Trigger', 'Mana Value', 'Combat Damage', etc.) **altijd** in de **originele ENGELSE term**. "
+        "* **Kort & Accuraat:** Beantwoord de gebruikersvraag **zo kort en feitelijk mogelijk**, maar met de precisie van een L3 Judge. Vermijd overbodige uitleg, tenzij de complexiteit van de interactie (zoals Layers of Stack volgorde) dit vereist. "
+        "* **Basis voor Ruling:** Baseer je antwoord **uitsluitend** op de gegeven kaartteksten en de *uitgebreide Metadata*. "
+        "* **Antwoordstructuur:** **Begin je antwoord direct met de definitieve Ruling.** "
+        "* **Context:** Als de kaarten niet relevant zijn, of als de benodigde kaarten missen in de CONTEXT, vermeld dit kort en professioneel. "
     )
+    
     user_message = (
         f"--- CONTEXT VAN KAARTEN (INCL. METADATA) ---\n{card_context}\n"
-        f"--- REGELSVRAAG ---\n{question}\n\n"
-        "Wat is de Ruling van de Professor? (Uitspraak in het Nederlands):"
+        f"--- REGELSVRAAG (VASTGEHOUDEN AAN COMMANDER REGELS) ---\n{question}\n\n"
+        "Wat is de definitieve Ruling van de L3 Judge? (Uitspraak in het Nederlands):"
     )
 
     try:
@@ -1287,8 +1297,8 @@ def display_rules_judge_ui():
             return
 
     # --- STATE INITIALISATIE ---
+    # We initialiseren ALLE benodigde keys bij de start
     if "judge_messages" not in st.session_state:
-        # Start met lege chat, omdat de introductie nu in de banner staat
         st.session_state["judge_messages"] = [] 
         st.session_state["judge_last_extracted_cards"] = set()
         st.session_state["judge_waiting_for_selection"] = False 
@@ -1298,7 +1308,14 @@ def display_rules_judge_ui():
     # --- Interne helper functies met state logica ---
 
     def _process_card_names(extracted_card_names):
-        """ Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor. """
+        """ 
+        Verwerkt de lijst met kaartnamen, controleert op onzekerheid en bereidt de suggesties voor.
+        INCLUSIEF de cruciale initialisatie check om de KeyError op te lossen.
+        """
+        # CRUCIALE CHECK: Initialiseer de session_state key als deze ontbreekt (lost de KeyError op)
+        if "judge_last_extracted_cards" not in st.session_state:
+             st.session_state["judge_last_extracted_cards"] = set()
+
         current_card_set = st.session_state["judge_last_extracted_cards"].union(set(extracted_card_names))
         
         new_suggestions = {}
@@ -1362,16 +1379,16 @@ def display_rules_judge_ui():
 
 
     # --- JUDGE BANNER ---
-    col_img, col_title = st.columns([1, 6]) # Kleine kolom voor de afbeelding, grote voor de titel
+    col_img, col_title = st.columns([1, 5]) # Kleine kolom voor de afbeelding, grote voor de titel
 
     with col_img:
-        st.image("Ruxa.png", width=200)
+        st.image("Ruxa.png", width=300) # 
 
     with col_title:
         st.header(f"U heeft een vraag?") 
 
-    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**,**{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel. Wat is uw vraag?"
-    st.markdown(f"*{intro_text}*")
+    intro_text = f"Mijn naam is **{ASSISTANT_NAME}**, **{ASSISTANT_TITLE}**. Ik help u graag met de complexe regels van ons mooie spel."
+    st.markdown(f"{intro_text}")
     
     # --- CHAT GESCHIEDENIS TONEN ---
     for msg in st.session_state["judge_messages"]:
@@ -1383,7 +1400,7 @@ def display_rules_judge_ui():
 
     if st.session_state["judge_waiting_for_selection"]:
         
-        st.warning(f"🧐 {ASSISTANT_NAME} wil zeker zijn: selecteer je bedoelde kaart(en):")
+        st.warning(f"Selecteer de bedoelde kaart:")
         
         selected_confirmed_cards = st.session_state["judge_last_extracted_cards"].copy()
         
@@ -1400,7 +1417,7 @@ def display_rules_judge_ui():
             if f"Geen van deze" not in chosen_card:
                 selected_confirmed_cards.add(chosen_card)
 
-        if st.button(f"Bevestig Selectie en Vraag de {ASSISTANT_TITLE}", key="judge_confirm_btn"): 
+        if st.button(f"Bevestig geselecteerde kaart", key="judge_confirm_btn"): 
             st.session_state["judge_waiting_for_selection"] = False
             st.session_state["judge_suggested_card_names"] = {}
             _continue_processing_after_selection(selected_confirmed_cards)
@@ -1421,7 +1438,7 @@ def display_rules_judge_ui():
 
     # --- HOOFD LOGICA: CHAT INPUT (STANDAARD FLOW) ---
 
-    if user_query := st.chat_input("Uw regelvraag...", key="judge_chat_input"): 
+    if user_query := st.chat_input("Wat is uw vraag?", key="judge_chat_input"): 
         
         st.session_state["judge_messages"].append({"role": "user", "content": user_query})
         # Gebruikt nu de nieuwe constante USER_AVATAR_EMOJI
@@ -1440,7 +1457,6 @@ def display_rules_judge_ui():
             
         else:
             st.rerun()
-            
 # --------- 🔍 SET SEARCH Toggle --------
 def display_set_search_ui():
         spinner_ph = show_mana_spinner("Get your Sets Straight...")
